@@ -1,47 +1,120 @@
 # Internship Watcher
 
-Continuously monitors top tech companies and AI startups for new internship postings and pings you on Discord and/or email. Instead of fragile HTML scraping, it polls the stable public JSON APIs behind most career pages (Greenhouse, Lever, Ashby) plus two aggregated feeds: SimplifyJobs (covers Workday-based companies like Google, NVIDIA, Tesla, Microsoft) and Jobright/intern-list.com (their GitHub repos republish listings sourced from LinkedIn, Indeed, Handshake, and 200K+ career sites). Jobs appearing in multiple sources are deduped by a company+title fingerprint, so each role notifies once.
+Monitors 100+ top tech companies, AI startups, and quant firms for new AI/SWE internship postings every 10 minutes, pings a Discord server the moment something drops, and files jobs into per-member Notion trackers via 📌 reactions.
+
+```
+                       ┌──────────────────────────────────────────┐
+                       │   GitHub Actions (every 10 min, free)    │
+                       └──────────────────────────────────────────┘
+                                          │
+        ┌───────────────────┬─────────────┴──────────────┬────────────────────┐
+        ▼                   ▼                            ▼                    ▼
+  107 company boards   SimplifyJobs feed         Jobright/InternList    (your additions)
+  Greenhouse / Lever   (Google, NVIDIA, Meta,    GitHub repos (SWE +
+  / Ashby JSON APIs    other Workday-only cos)   Data-Analysis lists)
+        │                   │                            │
+        └───────────┬───────┴──────────┬─────────────────┘
+                    ▼                  ▼
+          keyword filter      cross-source dedup (seen.json
+          (intern, co-op…)    + company+title fingerprints)
+                    │
+       ┌────────────┴───────────────┐
+       ▼                            ▼
+  ⭐ top-companies channel     # general channel            ┌─► Notion master log
+  (curated boards +           (everything else        ─────┤   (all postings)
+  big-tech feed)              from the firehose)           └─► 📌 react → your own
+                                                               Notion tracker
+```
 
 ## How it works
 
-Every run, `watcher.py` fetches all job boards listed in `config.json`, filters titles against your `include_keywords` / `exclude_keywords`, drops anything already recorded in `seen.json`, sends a notification for genuinely new postings, and updates `seen.json`. Run it on a schedule and it becomes a continuous monitor.
+Each run, `watcher.py`:
 
-## Setup (GitHub Actions — recommended, free, runs 24/7)
+1. Fetches all job boards in `config.json` in parallel (~10s for 107 boards) plus two aggregated feeds: **SimplifyJobs** (covers Workday-only companies like Google, NVIDIA, Tesla, Microsoft) and **Jobright** (which also runs intern-list.com; their GitHub repos republish listings from LinkedIn, Indeed, Handshake, and 200K+ career sites).
+2. Filters titles against `include_keywords` / `exclude_keywords` and the configured terms (currently Fall 2026 – Summer 2027).
+3. Dedupes against `seen.json` — by posting id, and for aggregator entries also by a company+title fingerprint, so a job appearing on a company board *and* Simplify *and* Jobright notifies exactly once.
+4. Posts each genuinely new job as its own Discord message. Jobs from the curated boards or the big-tech feed go to the **top-companies** webhook; the rest go to the **general** webhook. Batches over 25 (e.g. first seeding) are posted as a digest instead.
+5. Logs every new posting to the shared **"All Internship Postings"** Notion database, then polls 📌 reactions on recent job messages and files those jobs into the reacting member's personal Notion tracker (auto-created on first reaction).
 
-1. Create a new GitHub repo and push these files.
-2. In a Discord server you control: Server Settings → Integrations → Webhooks → New Webhook → copy the URL.
-3. In the repo: Settings → Secrets and variables → Actions → add secret `DISCORD_WEBHOOK_URL` with that URL.
-4. (Optional email) Add secrets `SMTP_USER`, `SMTP_PASS` (for Gmail, use an App Password from myaccount.google.com/apppasswords), and `ALERT_EMAIL`.
-5. Done — `.github/workflows/watch.yml` runs every 30 minutes and commits `seen.json` back so you're never re-notified. Trigger it manually once from the Actions tab to seed the history (the first run will alert on everything currently open).
+No HTML scraping anywhere — every source is a stable JSON API or a markdown file in a public repo, which is why it doesn't break weekly.
 
-## Setup (local cron alternative)
+## Full setup from scratch
 
-```bash
-pip install requests
-export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
-python watcher.py
-```
+### 1. Fork/push the repo and enable Actions
 
-Then `crontab -e` and add: `*/30 * * * * cd /path/to/internship-watcher && DISCORD_WEBHOOK_URL="..." python3 watcher.py >> watcher.log 2>&1`
+Push these files to a GitHub repo. `.github/workflows/watch.yml` runs every 10 minutes (GitHub treats schedules as best-effort; expect 10–15 min in practice). Trigger it once manually from the **Actions** tab to seed `seen.json` — the first run digests everything currently open.
 
-## Notion trackers (optional)
+### 2. Discord webhooks (notifications)
 
-Every new posting is logged to a shared "All Internship Postings" Notion database. Server members 📌-react to any job message in Discord, and within ~10 minutes the job is filed into their own auto-created Notion tracker database (Status: Saved/Applied/OA/Interview/Offer/Rejected). Reactions are tracked for 3 days per message.
+For each channel you want (top-companies and/or general):
 
-Secrets required:
-- `NOTION_TOKEN` — notion.so/my-integrations → New integration → copy the secret. Then open the Notion page that should hold the databases → ••• → Connections → add the integration.
-- `NOTION_PARENT_PAGE_ID` — the 32-hex-char id at the end of that page's URL.
-- `DISCORD_BOT_TOKEN` — discord.com/developers/applications → New Application → Bot → Reset Token. Invite it with View Channels + Read Message History (no privileged intents needed; it only reads reactions via REST).
+1. Server Settings → **Integrations** → **Webhooks** → **New Webhook**
+2. Name it, point it at the right channel, **Copy Webhook URL**
+3. Repo → Settings → Secrets and variables → Actions → **New repository secret**:
+   - `DISCORD_WEBHOOK_URL` — the general/firehose channel
+   - `DISCORD_WEBHOOK_URL_TOP` — the top-companies channel (optional; falls back to the general one)
 
-Members need access to the parent Notion page to see their tracker (share it with the server or invite them).
+### 3. Notion (shared log + personal trackers, optional)
+
+1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) → **New integration** (type: Internal). Copy the secret → repo secret `NOTION_TOKEN`.
+2. Create a Notion page to hold everything (e.g. "Internship Hub"). On that page: **•••** → **Connections** → add your integration.
+3. The page id is the 32-hex-char string at the end of the page URL (dashes optional) → repo secret `NOTION_PARENT_PAGE_ID`.
+4. Share that page with your server members (Share → invite, or publish to web) so they can see their trackers.
+
+### 4. Discord bot (📌 reaction tracking, optional)
+
+Needed only so the watcher can *read* reactions; it never posts.
+
+1. [discord.com/developers/applications](https://discord.com/developers/applications) → **New Application** → **Bot** → **Reset Token** → copy → repo secret `DISCORD_BOT_TOKEN`. No privileged intents needed.
+2. OAuth2 → URL Generator: scope `bot`, permissions **View Channels** + **Read Message History**. Open the generated URL and invite the bot to your server.
+3. Make sure the bot's role can see the channels the webhooks post into.
+
+### Secrets summary
+
+| Secret | Required for | 
+| ------ | ------------ |
+| `DISCORD_WEBHOOK_URL` | all Discord notifications |
+| `DISCORD_WEBHOOK_URL_TOP` | separate top-companies channel |
+| `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` | Notion master log + trackers |
+| `DISCORD_BOT_TOKEN` | 📌 per-member tracking |
+| `SMTP_USER`, `SMTP_PASS`, `ALERT_EMAIL` | optional email alerts (Gmail app password) |
+
+## Using it (for server members)
+
+- Watch the channels; every message is one internship.
+- React **📌** to any job within 3 days of posting → within ~10 minutes it appears in "📌 *your name*'s Internship Tracker" in Notion with Status **Saved**.
+- Update Status in Notion as you go: Saved → Applied → OA → Interview → Offer / Rejected.
 
 ## Customizing
 
-- **Add a company**: find its careers page URL. `boards.greenhouse.io/<slug>` → `"ats": "greenhouse"`; `jobs.lever.co/<slug>` → `"ats": "lever"`; `jobs.ashbyhq.com/<slug>` → `"ats": "ashby"`. Add the slug as `board` in `config.json`. If a board returns 404 warnings in the logs, the slug changed — check the careers URL.
-- **Tune the aggregated feed**: `simplify.company_keywords` filters which companies from the big feed you hear about (empty list = all of them, which is noisy), `terms` filters by season, `max_age_days` ignores stale postings.
-- **Narrow to ML/research roles**: change `include_keywords` to e.g. `["machine learning intern", "research intern", "ml intern", "ai intern"]`.
+- **Add a company**: find its careers page. `boards.greenhouse.io/<slug>` → `"ats": "greenhouse"`; `jobs.lever.co/<slug>` → `"ats": "lever"`; `jobs.ashbyhq.com/<slug>` → `"ats": "ashby"`. Add to `companies` in `config.json`. Verify slugs first with `python3 verify_boards.py` (add candidates to its list) — wrong slugs 404 silently.
+- **Adding a company also promotes it**: channel routing treats any company in `companies` or `simplify.company_keywords` as "top".
+- **Tune the Simplify feed**: `simplify.terms` filters by season; `company_keywords` controls which companies from the giant feed you hear about; `max_age_days` ignores stale postings.
+- **Tune Jobright volume**: `jobright.repos` — drop `2026-Data-Analysis-Internship` to halve the firehose, or disable with `"enabled": false`. Repo names track Jobright's categories at [github.com/jobright-ai](https://github.com/jobright-ai); bump the year as they roll over.
+- **Narrow to ML/research only**: set `include_keywords` to e.g. `["machine learning intern", "research intern", "ml intern", "ai intern"]`.
 
-## Notes
+## State files (committed back by the workflow)
 
-- Postings on Workday-only career sites (Google, Apple, NVIDIA, etc.) come in through the Simplify feed rather than direct polling, since Workday has no friendly public API.
-- `seen.json` is the only state. Delete it to re-alert on everything.
+| File | Contents |
+| ---- | -------- |
+| `seen.json` | every posting id + company+title fingerprint ever notified. Delete to re-alert on everything. |
+| `message_map.json` | Discord message id → job, for reaction tracking (3-day rolling window) |
+| `notion_state.json` | Notion database ids + which jobs are filed per member |
+
+## Troubleshooting
+
+- **`[warn] ... -> HTTP 404` in logs**: a company changed its board slug — re-verify with `verify_boards.py` and update `config.json`.
+- **No notifications but runs are green**: check the run logs — "0 new" is normal most runs; postings cluster in bursts (especially Aug–Oct).
+- **Duplicate pings**: dedup fingerprints are exact company+title; minor title variants across sources can slip through occasionally.
+- **Schedule stops after ~60 days of repo inactivity**: GitHub disables idle workflows; the bot's `seen.json` commits normally prevent this, but if it pauses, re-enable from the Actions tab.
+- **Workflow push conflicts**: the persist step rebases before pushing; if you push config changes mid-run it may retry next cycle. Run `git pull --rebase` locally before editing.
+
+## Local run (testing / alternative to Actions)
+
+```bash
+pip install -r requirements.txt
+export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."   # optional
+python3 watcher.py
+```
+
+Everything is env-var driven; with nothing set it prints findings to the console.
