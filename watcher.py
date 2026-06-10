@@ -17,6 +17,7 @@ import re
 import smtplib
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -212,17 +213,22 @@ def main():
 
     all_jobs = []
 
-    # 1) Direct ATS boards for companies you care most about
-    for c in cfg.get("companies", []):
+    # 1) Direct ATS boards for companies you care most about (parallel)
+    def fetch_company(c):
         fetcher = ATS_FETCHERS.get(c["ats"])
         if not fetcher:
             print(f"  [warn] unknown ATS '{c['ats']}' for {c['name']}")
-            continue
-        print(f"Checking {c['name']} ({c['ats']})...")
-        for j in fetcher(c["board"]):
-            if matches(j["title"], include_kw, exclude_kw):
-                j["company"] = c["name"]
-                all_jobs.append(j)
+            return c, []
+        return c, fetcher(c["board"])
+
+    companies = cfg.get("companies", [])
+    print(f"Checking {len(companies)} company boards...")
+    with ThreadPoolExecutor(max_workers=16) as ex:
+        for c, jobs in ex.map(fetch_company, companies):
+            for j in jobs:
+                if matches(j["title"], include_kw, exclude_kw):
+                    j["company"] = c["name"]
+                    all_jobs.append(j)
 
     # 2) Aggregated feed (catches Workday-only companies, new startups, etc.)
     if cfg.get("simplify", {}).get("enabled", True):

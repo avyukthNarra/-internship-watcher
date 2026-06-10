@@ -2,11 +2,15 @@ name: Internship Watcher
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes
+    - cron: "*/10 * * * *"   # every 10 minutes (best-effort; GitHub may delay)
   workflow_dispatch: {}       # manual trigger button
 
 permissions:
   contents: write             # to commit seen.json back
+
+concurrency:
+  group: watcher              # never run two watchers at once (seen.json races)
+  cancel-in-progress: false
 
 jobs:
   watch:
@@ -17,8 +21,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
-      - run: pip install requests
+      - run: pip install -r requirements.txt
 
       - name: Run watcher
         env:
@@ -34,4 +39,5 @@ jobs:
           git config user.email "actions@github.com"
           git add seen.json || true
           git diff --cached --quiet || git commit -m "Update seen postings [skip ci]"
+          git pull --rebase origin main
           git push
