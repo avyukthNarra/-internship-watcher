@@ -66,8 +66,9 @@ For each channel you want (top-companies and/or general):
 Needed only so the watcher can *read* reactions; it never posts.
 
 1. [discord.com/developers/applications](https://discord.com/developers/applications) → **New Application** → **Bot** → **Reset Token** → copy → repo secret `DISCORD_BOT_TOKEN`. No privileged intents needed.
-2. OAuth2 → URL Generator: scope `bot`, permissions **View Channels** + **Read Message History**. Open the generated URL and invite the bot to your server.
+2. OAuth2 → URL Generator: check **only the `bot` scope** (ignore the dozens of other scopes); a Bot Permissions panel then appears — check **View Channels** + **Read Message History**. Open the generated URL and invite the bot to your server. Shortcut: `https://discord.com/oauth2/authorize?client_id=<your app id>&scope=bot&permissions=66560` is the same thing.
 3. Make sure the bot's role can see the channels the webhooks post into.
+4. The bot will always show as **offline** — that's normal. It never connects to the gateway; the scheduled job reads reactions over REST.
 
 ### Secrets summary
 
@@ -82,7 +83,7 @@ Needed only so the watcher can *read* reactions; it never posts.
 ## Using it (for server members)
 
 - Watch the channels; every message is one internship.
-- React **📌** to any job within 3 days of posting → within ~10 minutes it appears in "📌 *your name*'s Internship Tracker" in Notion with Status **Saved**.
+- React **📌** to any job within 3 days of posting → within ~10 minutes it appears in "📌 *your name*'s Internship Tracker" in Notion with Status **Saved**. It must be the regular pushpin 📌 (search "pushpin" in the reaction picker), not 📍 — other emojis are ignored.
 - Update Status in Notion as you go: Saved → Applied → OA → Interview → Offer / Rejected.
 
 ## Customizing
