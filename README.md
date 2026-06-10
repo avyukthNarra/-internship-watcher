@@ -1,6 +1,6 @@
 # Internship Watcher
 
-Continuously monitors top tech companies and AI startups for new internship postings and pings you on Discord and/or email. Instead of fragile HTML scraping, it polls the stable public JSON APIs behind most career pages (Greenhouse, Lever, Ashby) plus the SimplifyJobs aggregated internship feed, which covers Workday-based companies like Google, NVIDIA, Tesla, and Microsoft.
+Continuously monitors top tech companies and AI startups for new internship postings and pings you on Discord and/or email. Instead of fragile HTML scraping, it polls the stable public JSON APIs behind most career pages (Greenhouse, Lever, Ashby) plus two aggregated feeds: SimplifyJobs (covers Workday-based companies like Google, NVIDIA, Tesla, Microsoft) and Jobright/intern-list.com (their GitHub repos republish listings sourced from LinkedIn, Indeed, Handshake, and 200K+ career sites). Jobs appearing in multiple sources are deduped by a company+title fingerprint, so each role notifies once.
 
 ## How it works
 

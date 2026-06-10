@@ -134,6 +134,12 @@
     ]
   },
 
+  "jobright": {
+    "enabled": true,
+    "repos": ["2026-Software-Engineer-Internship", "2026-Data-Analysis-Internship"],
+    "max_age_days": 7
+  },
+
   "smtp_host": "smtp.gmail.com",
   "smtp_port": 587
 }

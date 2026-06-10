@@ -68,6 +68,22 @@ def get(url: str):
     return None
 
 
+def get_text(url: str):
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        if r.status_code == 200:
+            return r.text
+        print(f"  [warn] {url} -> HTTP {r.status_code}")
+    except requests.RequestException as e:
+        print(f"  [warn] {url} -> {e}")
+    return None
+
+
+def norm_key(job) -> str:
+    """Company+title fingerprint for deduping the same job across sources."""
+    return "norm:" + re.sub(r"[^a-z0-9]+", "", (job["company"] + job["title"]).lower())
+
+
 # ------------------------------------------------------------- ATS fetchers
 
 def fetch_greenhouse(board: str):
@@ -159,6 +175,53 @@ def fetch_simplify(cfg):
     return out
 
 
+JOBRIGHT_ROW = re.compile(
+    r"^\|\s*(?:\*\*\[(?P<company>.+?)\]\(.*?\)\*\*|↳)\s*"
+    r"\|\s*\*\*\[(?P<title>.+?)\]\((?P<url>https://jobright\.ai/jobs/info/(?P<jid>[0-9a-f]+)\S*?)\)\*\*\s*"
+    r"\|\s*(?P<location>.*?)\s*\|.*?\|\s*(?P<date>\w{3} \d{2})\s*\|"
+)
+
+
+def fetch_jobright(cfg):
+    """Jobright/intern-list.com listings, published to their GitHub repos as
+    markdown tables (one repo per category, rolling window of recent posts)."""
+    jr = cfg.get("jobright", {})
+    max_age_days = jr.get("max_age_days", 7)
+    now = datetime.now(timezone.utc)
+
+    out = []
+    for repo in jr.get("repos", []):
+        text = get_text(
+            f"https://raw.githubusercontent.com/jobright-ai/{repo}/master/README.md")
+        if not text:
+            continue
+        company = None
+        for line in text.splitlines():
+            m = JOBRIGHT_ROW.match(line)
+            if not m:
+                continue
+            company = m["company"] or company  # ↳ rows inherit the company
+            if not company:
+                continue
+            # "Jun 09" has no year: assume the most recent past occurrence
+            posted = datetime.strptime(m["date"], "%b %d").replace(
+                year=now.year, tzinfo=timezone.utc)
+            if posted > now:
+                posted = posted.replace(year=now.year - 1)
+            if (now - posted).days > max_age_days:
+                continue
+            out.append(
+                {
+                    "id": f"jobright:{m['jid']}",
+                    "company": company,
+                    "title": m["title"],
+                    "location": m["location"],
+                    "url": m["url"].split("?")[0],
+                }
+            )
+    return out
+
+
 # ------------------------------------------------------------ notifications
 
 def notify_discord(webhook_url: str, jobs):
@@ -208,6 +271,7 @@ def notify_email(cfg, jobs):
 def main():
     cfg = load_json(CONFIG_PATH, {})
     seen = set(load_json(SEEN_PATH, []))
+    seen_before = set(seen)
     include_kw = cfg.get("include_keywords", ["intern"])
     exclude_kw = cfg.get("exclude_keywords", [])
 
@@ -230,15 +294,36 @@ def main():
                     j["company"] = c["name"]
                     all_jobs.append(j)
 
-    # 2) Aggregated feed (catches Workday-only companies, new startups, etc.)
+    # 2) Aggregated feeds (catch Workday-only companies, new startups, etc.)
     if cfg.get("simplify", {}).get("enabled", True):
         print("Checking SimplifyJobs aggregated feed...")
         for j in fetch_simplify(cfg):
             if matches(j["title"], include_kw, exclude_kw):
+                j["agg"] = True
                 all_jobs.append(j)
 
-    # Dedupe against history
-    new_jobs = [j for j in all_jobs if j["id"] not in seen]
+    if cfg.get("jobright", {}).get("enabled", False):
+        print("Checking Jobright/InternList feeds...")
+        for j in fetch_jobright(cfg):
+            if matches(j["title"], include_kw, exclude_kw):
+                j["agg"] = True
+                all_jobs.append(j)
+
+    # Dedupe against history. Direct-board postings dedupe by id only (two
+    # real openings can share a title); aggregator entries are also dropped
+    # when any source already surfaced the same company+title.
+    new_jobs = []
+    for j in all_jobs:
+        if j["id"] in seen:
+            continue
+        if j.get("agg") and norm_key(j) in seen:
+            seen.add(j["id"])  # remember the alias id, stop re-checking it
+            continue
+        new_jobs.append(j)
+        seen.add(j["id"])
+        seen.add(norm_key(j))
+    for j in all_jobs:
+        seen.add(norm_key(j))
     print(f"\nFound {len(all_jobs)} matching postings, {len(new_jobs)} new.")
 
     if new_jobs:
@@ -256,7 +341,7 @@ def main():
             print("[note] No DISCORD_WEBHOOK_URL or SMTP_USER/SMTP_PASS set; "
                   "printed to console only.")
 
-        seen.update(j["id"] for j in new_jobs)
+    if seen != seen_before:
         SEEN_PATH.write_text(json.dumps(sorted(seen), indent=0))
 
     return 0
