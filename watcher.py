@@ -330,10 +330,30 @@ def main():
         for j in new_jobs:
             print(f"  NEW: {j['company']} — {j['title']} ({j['url']})")
 
+        # Route: curated boards + Simplify (already keyword-filtered to big
+        # names) -> the "top companies" channel; the Jobright firehose -> the
+        # main channel, unless its company matches a curated name/keyword.
         webhook = os.environ.get("DISCORD_WEBHOOK_URL")
-        if webhook:
-            notify_discord(webhook, new_jobs)
-            print("Discord notification sent.")
+        webhook_top = os.environ.get("DISCORD_WEBHOOK_URL_TOP")
+        top_names = {c["name"].lower() for c in cfg.get("companies", [])}
+        top_kw = [k.lower() for k in
+                  cfg.get("simplify", {}).get("company_keywords", [])]
+
+        top, rest = [], []
+        for j in new_jobs:
+            src = j["id"].split(":", 1)[0]
+            company = j["company"].lower()
+            is_top = (src in ("greenhouse", "lever", "ashby", "simplify")
+                      or company in top_names
+                      or any(k in company for k in top_kw))
+            (top if is_top else rest).append(j)
+
+        if top and (webhook_top or webhook):
+            notify_discord(webhook_top or webhook, top)
+            print(f"Discord notification sent ({len(top)} top-company).")
+        if rest and webhook:
+            notify_discord(webhook, rest)
+            print(f"Discord notification sent ({len(rest)} other).")
         if os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASS"):
             notify_email(cfg, new_jobs)
             print("Email notification sent.")
