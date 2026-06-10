@@ -24,6 +24,17 @@ python watcher.py
 
 Then `crontab -e` and add: `*/30 * * * * cd /path/to/internship-watcher && DISCORD_WEBHOOK_URL="..." python3 watcher.py >> watcher.log 2>&1`
 
+## Notion trackers (optional)
+
+Every new posting is logged to a shared "All Internship Postings" Notion database. Server members 📌-react to any job message in Discord, and within ~10 minutes the job is filed into their own auto-created Notion tracker database (Status: Saved/Applied/OA/Interview/Offer/Rejected). Reactions are tracked for 3 days per message.
+
+Secrets required:
+- `NOTION_TOKEN` — notion.so/my-integrations → New integration → copy the secret. Then open the Notion page that should hold the databases → ••• → Connections → add the integration.
+- `NOTION_PARENT_PAGE_ID` — the 32-hex-char id at the end of that page's URL.
+- `DISCORD_BOT_TOKEN` — discord.com/developers/applications → New Application → Bot → Reset Token. Invite it with View Channels + Read Message History (no privileged intents needed; it only reads reactions via REST).
+
+Members need access to the parent Notion page to see their tracker (share it with the server or invite them).
+
 ## Customizing
 
 - **Add a company**: find its careers page URL. `boards.greenhouse.io/<slug>` → `"ats": "greenhouse"`; `jobs.lever.co/<slug>` → `"ats": "lever"`; `jobs.ashbyhq.com/<slug>` → `"ats": "ashby"`. Add the slug as `board` in `config.json`. If a board returns 404 warnings in the logs, the slug changed — check the careers URL.

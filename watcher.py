@@ -27,6 +27,7 @@ import requests
 ROOT = Path(__file__).parent
 CONFIG_PATH = ROOT / "config.json"
 SEEN_PATH = ROOT / "seen.json"
+MSG_MAP_PATH = ROOT / "message_map.json"  # discord message id -> job, for 📌 tracking
 
 SIMPLIFY_URL = (
     "https://raw.githubusercontent.com/SimplifyJobs/"
@@ -225,6 +226,44 @@ def fetch_jobright(cfg):
 # ------------------------------------------------------------ notifications
 
 def notify_discord(webhook_url: str, jobs):
+    """Post one message per job so members can 📌-react to file it into
+    their personal Notion tracker. Big batches (re-seeds) fall back to a
+    digest. Returns records mapping message ids to jobs."""
+    if len(jobs) > 25:
+        _notify_discord_digest(webhook_url, jobs)
+        return []
+
+    posted = []
+    for j in jobs:
+        content = (
+            f"**{j['company']}** — [{j['title']}]({j['url']})"
+            + (f" · {j['location']}" if j["location"] else "")
+            + "\n-# 📌 react to add this to your Notion tracker"
+        )
+        r = requests.post(f"{webhook_url}?wait=true",
+                          json={"content": content}, timeout=TIMEOUT)
+        if r.status_code == 429:
+            time.sleep(float(r.json().get("retry_after", 2)) + 0.5)
+            r = requests.post(f"{webhook_url}?wait=true",
+                              json={"content": content}, timeout=TIMEOUT)
+        if r.status_code == 200:
+            d = r.json()
+            posted.append(
+                {
+                    "mid": d["id"],
+                    "cid": d["channel_id"],
+                    "ts": time.time(),
+                    "job": {k: j.get(k, "") for k in
+                            ("id", "company", "title", "url", "location")},
+                }
+            )
+        else:
+            print(f"  [warn] discord post -> HTTP {r.status_code}")
+        time.sleep(0.4)  # stay under the webhook rate limit
+    return posted
+
+
+def _notify_discord_digest(webhook_url: str, jobs):
     # Discord caps messages at 2000 chars; chunk the list.
     lines = [
         f"**{j['company']}** — [{j['title']}]({j['url']})"
@@ -348,12 +387,22 @@ def main():
                       or any(k in company for k in top_kw))
             (top if is_top else rest).append(j)
 
+        msg_records = []
         if top and (webhook_top or webhook):
-            notify_discord(webhook_top or webhook, top)
+            msg_records += notify_discord(webhook_top or webhook, top)
             print(f"Discord notification sent ({len(top)} top-company).")
         if rest and webhook:
-            notify_discord(webhook, rest)
+            msg_records += notify_discord(webhook, rest)
             print(f"Discord notification sent ({len(rest)} other).")
+
+        if msg_records:
+            msg_map = load_json(MSG_MAP_PATH, {})
+            for rec in msg_records:
+                msg_map[rec["mid"]] = {
+                    "cid": rec["cid"], "ts": rec["ts"], "job": rec["job"]}
+            cutoff = time.time() - 3 * 86400  # reactions tracked for 3 days
+            msg_map = {k: v for k, v in msg_map.items() if v["ts"] >= cutoff}
+            MSG_MAP_PATH.write_text(json.dumps(msg_map, indent=0))
         if os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASS"):
             notify_email(cfg, new_jobs)
             print("Email notification sent.")
@@ -363,6 +412,12 @@ def main():
 
     if seen != seen_before:
         SEEN_PATH.write_text(json.dumps(sorted(seen), indent=0))
+
+    # 3) Notion: master log of every new posting + per-member trackers
+    #    built from 📌 reactions (see notion_sync.py).
+    if os.environ.get("NOTION_TOKEN") and os.environ.get("NOTION_PARENT_PAGE_ID"):
+        import notion_sync
+        notion_sync.run(new_jobs)
 
     return 0
 
