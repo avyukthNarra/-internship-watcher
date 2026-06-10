@@ -1,0 +1,52 @@
+{
+  "include_keywords": ["intern", "internship", "co-op", "coop"],
+  "exclude_keywords": [
+    "unpaid", "internal",
+    "mechanical", "civil engineer", "legal", "paralegal",
+    "sales", "marketing", "recruiting", "accounting", "finance intern",
+    "supply chain", "communications intern", "hr intern"
+  ],
+
+  "companies": [
+    { "name": "Anthropic",     "ats": "greenhouse", "board": "anthropic" },
+    { "name": "Databricks",    "ats": "greenhouse", "board": "databricks" },
+    { "name": "Stripe",        "ats": "greenhouse", "board": "stripe" },
+    { "name": "Figma",         "ats": "greenhouse", "board": "figma" },
+    { "name": "Scale AI",      "ats": "greenhouse", "board": "scaleai" },
+    { "name": "Discord",       "ats": "greenhouse", "board": "discord" },
+    { "name": "Duolingo",      "ats": "greenhouse", "board": "duolingo" },
+    { "name": "Pinterest",     "ats": "greenhouse", "board": "pinterest" },
+    { "name": "DoorDash",      "ats": "greenhouse", "board": "doordashusa" },
+    { "name": "Coinbase",      "ats": "greenhouse", "board": "coinbase" },
+    { "name": "Snowflake",     "ats": "greenhouse", "board": "snowflakecomputing" },
+    { "name": "Cloudflare",    "ats": "greenhouse", "board": "cloudflare" },
+
+    { "name": "OpenAI",        "ats": "ashby",      "board": "openai" },
+    { "name": "Perplexity",    "ats": "ashby",      "board": "perplexity.ai" },
+    { "name": "Ramp",          "ats": "ashby",      "board": "ramp" },
+    { "name": "Cohere",        "ats": "ashby",      "board": "cohere" },
+    { "name": "Notion",        "ats": "ashby",      "board": "notion" },
+    { "name": "Together AI",   "ats": "ashby",      "board": "together-ai" },
+    { "name": "ElevenLabs",    "ats": "ashby",      "board": "elevenlabs" },
+    { "name": "Cursor (Anysphere)", "ats": "ashby", "board": "cursor" },
+
+    { "name": "Plaid",         "ats": "lever",      "board": "plaid" },
+    { "name": "Palantir",      "ats": "lever",      "board": "palantir" },
+    { "name": "Mistral AI",    "ats": "lever",      "board": "mistral" }
+  ],
+
+  "simplify": {
+    "enabled": true,
+    "terms": ["Fall 2026", "Winter 2027", "Spring 2027", "Summer 2027"],
+    "max_age_days": 7,
+    "company_keywords": [
+      "google", "meta", "apple", "microsoft", "amazon", "nvidia", "netflix",
+      "openai", "anthropic", "deepmind", "tesla", "spacex", "hugging face",
+      "xai", "waymo", "two sigma", "jane street", "citadel", "bloomberg",
+      "uber", "airbnb", "linkedin", "salesforce", "adobe", "qualcomm", "amd"
+    ]
+  },
+
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 587
+}

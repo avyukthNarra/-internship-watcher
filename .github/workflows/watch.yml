@@ -1,0 +1,37 @@
+name: Internship Watcher
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch: {}       # manual trigger button
+
+permissions:
+  contents: write             # to commit seen.json back
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Run watcher
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: python watcher.py
+
+      - name: Persist seen.json
+        run: |
+          git config user.name "internship-watcher-bot"
+          git config user.email "actions@github.com"
+          git add seen.json || true
+          git diff --cached --quiet || git commit -m "Update seen postings [skip ci]"
+          git push
