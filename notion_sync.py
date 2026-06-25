@@ -56,9 +56,18 @@ def _notion_headers():
 
 def _notion(method, path, payload=None):
     for attempt in range(3):
-        r = requests.request(method, f"{NOTION_API}{path}",
-                             headers=_notion_headers(), json=payload,
-                             timeout=30)
+        try:
+            r = requests.request(method, f"{NOTION_API}{path}",
+                                 headers=_notion_headers(), json=payload,
+                                 timeout=30)
+        except requests.exceptions.RequestException as e:
+            # Transient network blip (read timeout, connection reset). A single
+            # slow Notion response must not crash the whole watcher run — back
+            # off and retry, then give up like any other failed call.
+            print(f"  [warn] notion {path} -> {type(e).__name__}; "
+                  f"retry {attempt + 1}/3")
+            time.sleep(2 * (attempt + 1))
+            continue
         if r.status_code == 429:
             time.sleep(float(r.headers.get("Retry-After", 2)))
             continue
@@ -109,10 +118,15 @@ def _add_row(db_id, job, status=None):
 
 def _pin_reactors(bot_token, channel_id, message_id):
     """Users who 📌-reacted to a message (REST only, no gateway needed)."""
-    r = requests.get(
-        f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}"
-        f"/reactions/{PIN_EMOJI}?limit=100",
-        headers={"Authorization": f"Bot {bot_token}"}, timeout=30)
+    try:
+        r = requests.get(
+            f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}"
+            f"/reactions/{PIN_EMOJI}?limit=100",
+            headers={"Authorization": f"Bot {bot_token}"}, timeout=30)
+    except requests.exceptions.RequestException as e:
+        # A Discord hiccup on one message shouldn't abort the whole sync.
+        print(f"  [warn] discord reactions -> {type(e).__name__}; skipping")
+        return []
     if r.status_code != 200:
         if r.status_code != 404:  # 404 = message deleted, not noteworthy
             print(f"  [warn] discord reactions -> HTTP {r.status_code}")
