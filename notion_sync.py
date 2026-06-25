@@ -117,21 +117,32 @@ def _add_row(db_id, job, status=None):
 # ------------------------------------------------------- discord reactions
 
 def _pin_reactors(bot_token, channel_id, message_id):
-    """Users who 📌-reacted to a message (REST only, no gateway needed)."""
-    try:
-        r = requests.get(
-            f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}"
-            f"/reactions/{PIN_EMOJI}?limit=100",
-            headers={"Authorization": f"Bot {bot_token}"}, timeout=30)
-    except requests.exceptions.RequestException as e:
-        # A Discord hiccup on one message shouldn't abort the whole sync.
-        print(f"  [warn] discord reactions -> {type(e).__name__}; skipping")
-        return []
-    if r.status_code != 200:
-        if r.status_code != 404:  # 404 = message deleted, not noteworthy
-            print(f"  [warn] discord reactions -> HTTP {r.status_code}")
-        return []
-    return [u for u in r.json() if not u.get("bot")]
+    """Users who 📌-reacted to a message (REST only, no gateway needed).
+
+    The sync polls every tracked message individually, so this route gets
+    hammered and Discord returns 429 constantly. A 429 is NOT "no reactions"
+    — honor Retry-After and retry, otherwise reactions are silently dropped.
+    """
+    url = (f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}"
+           f"/reactions/{PIN_EMOJI}?limit=100")
+    for attempt in range(5):
+        try:
+            r = requests.get(url, headers={"Authorization": f"Bot {bot_token}"},
+                             timeout=30)
+        except requests.exceptions.RequestException as e:
+            # A Discord hiccup on one message shouldn't abort the whole sync.
+            print(f"  [warn] discord reactions -> {type(e).__name__}; skipping")
+            return []
+        if r.status_code == 429:
+            time.sleep(min(float(r.headers.get("Retry-After", 1)), 5))
+            continue
+        if r.status_code != 200:
+            if r.status_code != 404:  # 404 = message deleted, not noteworthy
+                print(f"  [warn] discord reactions -> HTTP {r.status_code}")
+            return []
+        return [u for u in r.json() if not u.get("bot")]
+    print("  [warn] discord reactions -> still rate-limited after retries")
+    return []
 
 
 # ------------------------------------------------------------------- main
@@ -163,6 +174,9 @@ def run(new_jobs):
     if bot_token and msg_map:
         filed = 0
         for mid, rec in msg_map.items():
+            # Pace the per-message reaction polls so we don't blow Discord's
+            # rate limit on the very first calls (the map holds ~100+ msgs).
+            time.sleep(0.25)
             for user in _pin_reactors(bot_token, rec["cid"], mid):
                 uid = user["id"]
                 name = user.get("global_name") or user.get("username") or uid
