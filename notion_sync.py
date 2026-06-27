@@ -207,16 +207,54 @@ def _extract_url(text):
     return m.group(0).rstrip(").,]") if m else None
 
 
+_META_TAG_RE = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
+
+
+def _attr(tag, name):
+    m = (re.search(rf'{name}\s*=\s*"([^"]*)"', tag, re.IGNORECASE)
+         or re.search(rf"{name}\s*=\s*'([^']*)'", tag, re.IGNORECASE))
+    return html.unescape(m.group(1)).strip() if m else None
+
+
 def _meta(page, prop):
-    """Pull a <meta property="prop" content="..."> value (either attr order)."""
-    for pat in (
-        rf'<meta[^>]+property=["\']{re.escape(prop)}["\'][^>]+content=["\'](.*?)["\']',
-        rf'<meta[^>]+content=["\'](.*?)["\'][^>]+property=["\']{re.escape(prop)}["\']',
-    ):
-        m = re.search(pat, page, re.IGNORECASE | re.DOTALL)
-        if m:
-            return html.unescape(m.group(1)).strip()
+    """Value of <meta property|name="prop" content="...">, attr-order agnostic.
+
+    Scans tag-by-tag (each `<meta ...>` is matched on its own) so a lazy regex
+    can't run across minified markup and swallow other tags' attributes.
+    """
+    for tag in _META_TAG_RE.findall(page):
+        if (_attr(tag, "property") or _attr(tag, "name")) == prop:
+            content = _attr(tag, "content")
+            if content:
+                return content
     return None
+
+
+# Trailing segments that are the aggregator/site, not the employer.
+_SITE_SUFFIXES = {
+    "simplify", "simplify jobs", "linkedin", "indeed", "greenhouse", "lever",
+    "ashby", "workday", "glassdoor", "ziprecruiter", "wellfound", "builtin",
+    "jobs", "careers",
+}
+
+
+def _split_role_company(title):
+    """From a page title, return (role, company-or-None).
+
+    Handles "Role @ Company", "Role at Company", "Role - Company" after first
+    stripping a trailing site name like "... | Simplify Jobs".
+    """
+    for sep in (" | ", " — ", " – ", " - "):
+        if sep in title:
+            head, tail = title.rsplit(sep, 1)
+            if tail.strip().lower() in _SITE_SUFFIXES:
+                title = head.strip()
+                break
+    for sep_re in (r"\s+@\s+", r"\s+at\s+", r"\s+[-|–—]\s+"):
+        parts = re.split(sep_re, title, maxsplit=1)
+        if len(parts) == 2 and parts[1].strip():
+            return parts[0].strip(), parts[1].strip()
+    return title.strip(), None
 
 
 def _company_from_url(url):
@@ -254,13 +292,20 @@ def _parse_job_from_url(url):
                 m = re.search(r"<title[^>]*>(.*?)</title>", page,
                               re.IGNORECASE | re.DOTALL)
                 title = html.unescape(m.group(1)).strip() if m else ""
-            if not is_ats:
-                site = _meta(page, "og:site_name")
-                if site and len(site) <= 60:
-                    company = site
             if title:
-                # Drop a trailing " - Company" / " | Company" / " at Company".
-                role = re.split(r"\s+[-|–—]\s+|\s+at\s+", title)[0].strip() or title
+                role_part, company_part = _split_role_company(title)
+                role = role_part or role
+                # On ATS hosts the slug is the reliable employer; only trust a
+                # company parsed from the title (or og:site_name) elsewhere,
+                # since e.g. Simplify carries the real employer in its title.
+                if not is_ats:
+                    if company_part:
+                        company = company_part
+                    else:
+                        site = _meta(page, "og:site_name")
+                        if site and len(site) <= 60 \
+                                and site.lower() not in _SITE_SUFFIXES:
+                            company = site
     except requests.exceptions.RequestException:
         pass  # keep the URL-derived company + generic role
     return company[:200], role[:200], ""
