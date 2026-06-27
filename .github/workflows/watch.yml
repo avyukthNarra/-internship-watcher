@@ -30,6 +30,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_WEBHOOK_URL_TOP: ${{ secrets.DISCORD_WEBHOOK_URL_TOP }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          APPLIED_CHANNEL_ID: ${{ secrets.APPLIED_CHANNEL_ID }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_PARENT_PAGE_ID: ${{ secrets.NOTION_PARENT_PAGE_ID }}
           SMTP_USER: ${{ secrets.SMTP_USER }}

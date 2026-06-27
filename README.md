@@ -77,14 +77,26 @@ Needed only so the watcher can *read* reactions; it never posts.
 | `DISCORD_WEBHOOK_URL` | all Discord notifications |
 | `DISCORD_WEBHOOK_URL_TOP` | separate top-companies channel |
 | `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` | Notion master log + trackers |
-| `DISCORD_BOT_TOKEN` | 📌 per-member tracking |
+| `DISCORD_BOT_TOKEN` | 📌 per-member tracking + applied channel |
+| `APPLIED_CHANNEL_ID` | "applied" channel → auto-file to tracker (optional) |
 | `SMTP_USER`, `SMTP_PASS`, `ALERT_EMAIL` | optional email alerts (Gmail app password) |
+
+### 5. Applied channel (auto-log applications, optional)
+
+A dedicated channel where pasting a job link files it into your own tracker as **Applied** — no 📌 needed.
+
+1. Create a channel (e.g. `#applied`) and make sure the bot's role can **View Channel**, **Read Message History**, and **Add Reactions** there.
+2. In the [developer portal](https://discord.com/developers/applications) → your app → **Bot** → enable the **Message Content Intent** (required so the bot can read the pasted links over REST). Still no gateway connection — it stays offline.
+3. Turn on Developer Mode (Discord Settings → Advanced), right-click the channel → **Copy Channel ID** → repo secret `APPLIED_CHANNEL_ID`.
+
+The first run after enabling baselines the channel (older messages are ignored); links posted afterward are processed within ~10 minutes.
 
 ## Using it (for server members)
 
 - Watch the channels; every message is one internship.
 - React **📌** to any job within 3 days of posting → within ~10 minutes it appears in "📌 *your name*'s Internship Tracker" in Notion with Status **Saved**. It must be the regular pushpin 📌 (search "pushpin" in the reaction picker), not 📍 — other emojis are ignored.
 - Update Status in Notion as you go: Saved → Applied → OA → Interview → Offer / Rejected.
+- **Applied to something?** Paste the job link into the **#applied** channel. Within ~10 minutes the bot scrapes the company/role and adds it to *your* tracker with Status **Applied**, then reacts ✅ (⚠️ means it saw no link in your message). Source shows as `applied`.
 
 ## Customizing
 
