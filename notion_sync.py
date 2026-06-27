@@ -47,7 +47,6 @@ WARN_EMOJI = urllib.parse.quote("⚠️")
 
 DISCORD_EPOCH = 1420070400000  # ms; Discord snowflakes count from here
 URL_RE = re.compile(r"https?://[^\s<>|]+")
-ATS_HOSTS = ("greenhouse.io", "lever.co", "ashbyhq.com")
 
 STATUS_OPTIONS = [
     {"name": "Saved", "color": "gray"},
@@ -230,85 +229,213 @@ def _meta(page, prop):
     return None
 
 
-# Trailing segments that are the aggregator/site, not the employer.
+# Site/aggregator names that may trail a title or fill og:site_name — never
+# the actual employer.
 _SITE_SUFFIXES = {
     "simplify", "simplify jobs", "linkedin", "indeed", "greenhouse", "lever",
-    "ashby", "workday", "glassdoor", "ziprecruiter", "wellfound", "builtin",
-    "jobs", "careers",
+    "ashby", "workday", "smartrecruiters", "glassdoor", "ziprecruiter",
+    "wellfound", "builtin", "jobs", "careers",
 }
 
+# Second-level domains owned by an ATS/aggregator: the bare domain label is the
+# vendor, not the employer, so don't fall back to it as a company name.
+_BRAND_DOMAINS = {
+    "greenhouse", "lever", "ashbyhq", "myworkdayjobs", "oraclecloud", "icims",
+    "smartrecruiters", "workable", "simplify", "linkedin", "indeed",
+    "glassdoor", "ziprecruiter", "wellfound", "jobvite", "bamboohr",
+    "successfactors", "dayforcehcm", "paylocity",
+}
 
-def _split_role_company(title):
-    """From a page title, return (role, company-or-None).
+# Hosts whose first path segment is the employer slug.
+_PATH_SLUG_HOSTS = ("greenhouse.io", "lever.co", "ashbyhq.com",
+                    "smartrecruiters.com", "workable.com")
+_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
-    Handles "Role @ Company", "Role at Company", "Role - Company" after first
-    stripping a trailing site name like "... | Simplify Jobs".
-    """
+
+def _humanize(slug):
+    """creditkarma -> Creditkarma, ExpediaGroup -> Expedia Group,
+    al-warren-oil -> Al Warren Oil."""
+    s = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", slug)        # split camelCase
+    s = s.replace("-", " ").replace("_", " ").strip()
+    return s.title() if (s.islower() or s.isupper()) else s
+
+
+def _strip_site_suffix(title):
     for sep in (" | ", " — ", " – ", " - "):
         if sep in title:
             head, tail = title.rsplit(sep, 1)
             if tail.strip().lower() in _SITE_SUFFIXES:
-                title = head.strip()
-                break
-    for sep_re in (r"\s+@\s+", r"\s+at\s+", r"\s+[-|–—]\s+"):
-        parts = re.split(sep_re, title, maxsplit=1)
-        if len(parts) == 2 and parts[1].strip():
-            return parts[0].strip(), parts[1].strip()
-    return title.strip(), None
+                return head.strip()
+    return title
+
+
+def _strip_trailing_company(role, company):
+    for sep in (" @ ", " at ", " - ", " — ", " – ", " | "):
+        tail = (sep + company).lower()
+        if role.lower().endswith(tail):
+            return role[: -len(tail)].strip()
+    return role
+
+
+def _company_from_title(title):
+    """Employer out of "Role @ Company", "Role at Company", or
+    "Company hiring Role ..." (LinkedIn) patterns."""
+    t = _strip_site_suffix(title)
+    for pat in (r"\s+@\s+(?P<c>.+)$", r"\s+at\s+(?P<c>.+)$"):
+        m = re.search(pat, t)
+        if m:
+            return m.group("c").strip()
+    m = re.match(r"(?P<c>.+?)\s+hiring\s+", t)
+    return m.group("c").strip() if m else None
 
 
 def _company_from_url(url):
-    """Derive a company name from the URL: ATS board slug, else domain label."""
+    """Employer from the URL: Workday tenant, ATS path slug, else domain label
+    (skipping ATS/aggregator domains). May return None."""
     parsed = urllib.parse.urlparse(url)
     host = parsed.hostname or ""
     parts = [p for p in parsed.path.split("/") if p]
-    if any(host.endswith(d) for d in ATS_HOSTS) and parts:
-        return parts[0].replace("-", " ").replace("_", " ").title()
+    if host.endswith("myworkdayjobs.com"):
+        return _humanize(host.split(".")[0])             # tenant subdomain
+    for dom in _PATH_SLUG_HOSTS:
+        if host.endswith(dom) and parts:
+            return _humanize(parts[0])
     labels = host.split(".")
-    return labels[-2].title() if len(labels) >= 2 else (host or "Unknown")
+    if len(labels) >= 2 and labels[-2] not in _BRAND_DOMAINS:
+        return labels[-2].title()
+    return None
+
+
+def _json(url):
+    r = requests.get(url, headers={"User-Agent": "internship-watcher/1.0"},
+                     timeout=15)
+    return r.json() if r.status_code == 200 else None
+
+
+def _ats_api(url):
+    """Exact job data from an ATS public API as {company, role, location}, or
+    None. `company` is None when the API doesn't carry it (Greenhouse/Lever/
+    Ashby) and the caller resolves it from the page/slug instead."""
+    p = urllib.parse.urlparse(url)
+    host = p.hostname or ""
+    parts = [s for s in p.path.split("/") if s]
+    uuid = next((s for s in parts if _UUID_RE.fullmatch(s)), None)
+    q = urllib.parse.parse_qs(p.query)
+    try:
+        if host.endswith("greenhouse.io") and parts:
+            board, jid = parts[0], None
+            if "jobs" in parts:
+                i = parts.index("jobs")
+                jid = parts[i + 1] if i + 1 < len(parts) else None
+            jid = jid or q.get("gh_jid", [None])[0]
+            # The board endpoint carries the clean company name (og:title on the
+            # page is the company on some boards but the role on others, so it
+            # can't be trusted); the job endpoint carries role + location.
+            bn = _json(f"https://boards-api.greenhouse.io/v1/boards/{board}")
+            company = bn.get("name") if bn else None
+            role = location = None
+            if jid:
+                d = _json(f"https://boards-api.greenhouse.io/v1/boards/{board}"
+                          f"/jobs/{jid}")
+                if d:
+                    role = d.get("title")
+                    location = (d.get("location") or {}).get("name", "")
+            if company or role:
+                return {"company": company, "role": role,
+                        "location": location or ""}
+        elif host.endswith("lever.co") and parts and uuid:
+            d = _json(f"https://api.lever.co/v0/postings/{parts[0]}/{uuid}")
+            if d:
+                return {"company": None, "role": d.get("text"),
+                        "location": (d.get("categories") or {}).get("location", "")}
+        elif host.endswith("ashbyhq.com") and parts and uuid:
+            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{parts[0]}")
+            for j in (d or {}).get("jobs", []):
+                if j.get("id") == uuid:
+                    return {"company": None, "role": j.get("title"),
+                            "location": j.get("location", "")}
+        elif host.endswith("smartrecruiters.com") and parts:
+            cid = None
+            if "company" in parts:
+                i = parts.index("company")
+                cid = parts[i + 1] if i + 1 < len(parts) else None
+            cid = cid or q.get("dcr_ci", [None])[0] or parts[0]
+            pid = uuid or next((s for s in reversed(parts) if s.isdigit()), None)
+            if cid and pid:
+                d = _json(f"https://api.smartrecruiters.com/v1/companies/{cid}"
+                          f"/postings/{pid}")
+                if d:
+                    loc = d.get("location") or {}
+                    loc_s = ", ".join(x for x in (loc.get("city"),
+                                                  loc.get("region")) if x)
+                    return {"company": (d.get("company") or {}).get("name"),
+                            "role": d.get("name"), "location": loc_s}
+    except requests.exceptions.RequestException:
+        pass
+    return None
+
+
+def _clean_company(c):
+    """Trim careers-site decorations: "BHE Career Site" -> "BHE"."""
+    c = (c or "").strip()
+    for suf in (" Career Site", " Careers Site", " Careers", " Career",
+                " Jobs", " Talent Network", " Talent"):
+        if c.endswith(suf):
+            c = c[: -len(suf)].strip()
+    return c or "Unknown"
 
 
 def _parse_job_from_url(url):
     """Best-effort (company, role, location) from a job posting URL.
 
-    og:title gives the role; the company comes from the ATS slug, or the page's
-    og:site_name on non-ATS hosts (a Greenhouse/Lever/Ashby site_name is the ATS
-    brand, not the employer), or the domain. Always returns something so an
-    applied link is never dropped, even if the page can't be fetched.
+    Role/location come from the ATS API when the link is Greenhouse/Lever/Ashby;
+    otherwise from og:title. Company is resolved from the cleanest signal in
+    turn: a Greenhouse board's og:title, og:site_name, the employer named in the
+    title, the URL slug, then the domain. Always returns something so an applied
+    link is never dropped, even if the page can't be fetched.
     """
     host = urllib.parse.urlparse(url).hostname or ""
-    is_ats = any(host.endswith(d) for d in ATS_HOSTS)
-    company = _company_from_url(url)
-    role = "Applied position"
+    og_title = og_site = title_tag = None
     try:
         r = requests.get(
             url, headers={"User-Agent":
                           "internship-watcher/1.0 (+notion applied sync)"},
             timeout=20)
         if r.status_code == 200:
-            page = r.text
-            title = _meta(page, "og:title")
-            if not title:
-                m = re.search(r"<title[^>]*>(.*?)</title>", page,
-                              re.IGNORECASE | re.DOTALL)
-                title = html.unescape(m.group(1)).strip() if m else ""
-            if title:
-                role_part, company_part = _split_role_company(title)
-                role = role_part or role
-                # On ATS hosts the slug is the reliable employer; only trust a
-                # company parsed from the title (or og:site_name) elsewhere,
-                # since e.g. Simplify carries the real employer in its title.
-                if not is_ats:
-                    if company_part:
-                        company = company_part
-                    else:
-                        site = _meta(page, "og:site_name")
-                        if site and len(site) <= 60 \
-                                and site.lower() not in _SITE_SUFFIXES:
-                            company = site
+            og_title = _meta(r.text, "og:title")
+            og_site = _meta(r.text, "og:site_name")
+            m = re.search(r"<title[^>]*>(.*?)</title>", r.text,
+                          re.IGNORECASE | re.DOTALL)
+            title_tag = html.unescape(m.group(1)).strip() if m else None
     except requests.exceptions.RequestException:
-        pass  # keep the URL-derived company + generic role
-    return company[:200], role[:200], ""
+        pass
+
+    api = _ats_api(url)
+
+    # company: most reliable signal first
+    company = api.get("company") if api else None
+    if not company and og_site and len(og_site) <= 60 \
+            and og_site.lower() not in _SITE_SUFFIXES:
+        company = og_site
+    company = _clean_company(
+        company or _company_from_title(og_title or title_tag or "")
+        or _company_from_url(url) or "Unknown")
+
+    # role + location: exact via ATS API, else the page title
+    role = location = None
+    if api:
+        role, location = api["role"], api["location"]
+    if not role:
+        cand = _strip_site_suffix(og_title or title_tag or "")
+        cand = _strip_trailing_company(cand, company).strip(" |-—–·")
+        low = cand.lower()
+        junk = {"", "careers", "jobs", company.lower(),
+                f"{company.lower()} careers", f"{company.lower()} jobs"}
+        if low.rstrip(".") not in {j.rstrip(".") for j in junk}:
+            role = cand
+    role = role or "Applied position"
+    location = (location or "").strip().strip(",").strip()
+    return company.strip()[:200], role.strip()[:200], location[:200]
 
 
 def _sync_applied(state, bot_token, parent):
