@@ -134,9 +134,10 @@ def _add_row(db_id, job, status=None):
 def _pin_reactors(bot_token, channel_id, message_id):
     """Users who 📌-reacted to a message (REST only, no gateway needed).
 
-    The sync polls every tracked message individually, so this route gets
-    hammered and Discord returns 429 constantly. A 429 is NOT "no reactions"
-    — honor Retry-After and retry, otherwise reactions are silently dropped.
+    Only called for messages the bulk channel scan already showed to have a
+    📌, so it fires a handful of times per run at most. A 429 is NOT "no
+    reactions" — honor Retry-After and retry, otherwise reactions are
+    silently dropped.
     """
     url = (f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}"
            f"/reactions/{PIN_EMOJI}?limit=100")
@@ -202,6 +203,33 @@ def _channel_messages(bot_token, channel_id, after):
 def _snowflake_now():
     """A Discord snowflake for the current instant (used to baseline)."""
     return str((int(time.time() * 1000) - DISCORD_EPOCH) << 22)
+
+
+def _pinned_message_ids(bot_token, msg_map):
+    """Which tracked messages currently carry a 📌 — found by paging each
+    channel's recent messages in bulk (reaction summaries ride along free),
+    instead of one reactions request per tracked message. Cuts ~150 Discord
+    calls per run down to ~4."""
+    by_channel = {}
+    for mid, rec in msg_map.items():
+        by_channel.setdefault(rec["cid"], []).append(int(mid))
+
+    pinned = set()
+    for cid, mids in by_channel.items():
+        cursor = str(min(mids) - 1)
+        while True:
+            batch = _channel_messages(bot_token, cid, cursor)
+            if not batch:
+                break  # done, or fetch failed — reactions retry next run
+            for m in batch:
+                if m["id"] in msg_map and any(
+                        r.get("emoji", {}).get("name") == "📌"
+                        for r in m.get("reactions", [])):
+                    pinned.add(m["id"])
+            if len(batch) < 100:
+                break
+            cursor = str(max(int(m["id"]) for m in batch))
+    return pinned
 
 
 def _extract_url(text):
@@ -631,10 +659,8 @@ def run(new_jobs):
         msg_map = json.loads(MSG_MAP_PATH.read_text())
     if bot_token and msg_map:
         filed = 0
-        for mid, rec in msg_map.items():
-            # Pace the per-message reaction polls so we don't blow Discord's
-            # rate limit on the very first calls (the map holds ~100+ msgs).
-            time.sleep(0.25)
+        for mid in _pinned_message_ids(bot_token, msg_map):
+            rec = msg_map[mid]
             for user in _pin_reactors(bot_token, rec["cid"], mid):
                 uid = user["id"]
                 name = user.get("global_name") or user.get("username") or uid

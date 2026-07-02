@@ -255,12 +255,13 @@ def fetch_jobright(cfg):
 def notify_discord(webhook_url: str, jobs):
     """Post one message per job so members can 📌-react to file it into
     their personal Notion tracker. Big batches (re-seeds) fall back to a
-    digest. Returns records mapping message ids to jobs."""
+    digest. Returns (records mapping message ids to jobs, ids of jobs
+    Discord refused — left unseen so the next run retries them)."""
     if len(jobs) > 25:
         _notify_discord_digest(webhook_url, jobs)
-        return []
+        return [], set()
 
-    posted = []
+    posted, failed = [], set()
     for j in jobs:
         content = (
             f"**{j['company']}** — [{j['title']}]({j['url']})"
@@ -286,8 +287,9 @@ def notify_discord(webhook_url: str, jobs):
             )
         else:
             print(f"  [warn] discord post -> HTTP {r.status_code}")
+            failed.add(j["id"])
         time.sleep(0.4)  # stay under the webhook rate limit
-    return posted
+    return posted, failed
 
 
 def _notify_discord_digest(webhook_url: str, jobs):
@@ -423,13 +425,27 @@ def main():
                       or company_matches(company, top_kw))
             (top if is_top else rest).append(j)
 
-        msg_records = []
+        msg_records, failed_ids = [], set()
         if top and (webhook_top or webhook):
-            msg_records += notify_discord(webhook_top or webhook, top)
+            recs, fails = notify_discord(webhook_top or webhook, top)
+            msg_records += recs
+            failed_ids |= fails
             print(f"Discord notification sent ({len(top)} top-company).")
         if rest and webhook:
-            msg_records += notify_discord(webhook, rest)
+            recs, fails = notify_discord(webhook, rest)
+            msg_records += recs
+            failed_ids |= fails
             print(f"Discord notification sent ({len(rest)} other).")
+        if failed_ids:
+            # Leave refused jobs (ids AND fingerprints) out of seen.json so
+            # the next run retries them, from any source.
+            print(f"  [warn] {len(failed_ids)} post(s) refused; retrying "
+                  f"next run")
+            failed_jobs = [j for j in new_jobs if j["id"] in failed_ids]
+            seen -= failed_ids | {norm_key(j) for j in failed_jobs}
+            new_jobs = [j for j in new_jobs if j["id"] not in failed_ids]
+            for j in new_jobs:  # restore fingerprints shared with posted jobs
+                seen.add(norm_key(j))
 
         if msg_records:
             msg_map = load_json(MSG_MAP_PATH, {})
