@@ -7,6 +7,22 @@
     "supply chain", "communications intern", "hr intern"
   ],
 
+  "exclude_locations": [
+    "canada", "toronto", "vancouver", "montreal", "ottawa", "waterloo",
+    "united kingdom", "uk", "london", "ireland", "dublin",
+    "india", "bengaluru", "bangalore", "hyderabad", "mumbai", "pune",
+    "chennai", "gurgaon", "gurugram", "noida", "new delhi",
+    "china", "beijing", "shanghai", "shenzhen", "hong kong",
+    "taiwan", "taipei", "japan", "tokyo", "korea", "seoul", "singapore",
+    "australia", "sydney", "melbourne", "new zealand",
+    "germany", "berlin", "munich", "france", "paris",
+    "netherlands", "amsterdam", "poland", "warsaw", "krakow",
+    "switzerland", "zurich", "israel", "tel aviv",
+    "sweden", "stockholm", "spain", "madrid", "barcelona", "italy", "milan",
+    "brazil", "sao paulo", "mexico", "colombia", "argentina",
+    "europe", "emea", "apac"
+  ],
+
   "companies": [
     { "name": "Anthropic",       "ats": "greenhouse", "board": "anthropic" },
     { "name": "Databricks",      "ats": "greenhouse", "board": "databricks" },

@@ -92,6 +92,26 @@ def company_matches(company: str, keywords) -> bool:
     return any(re.search(rf"\b{re.escape(k)}\b", c) for k in keywords)
 
 
+# "City, ST" with a US state code (no overlap with Canadian provinces), or an
+# explicit USA mention. The (?=\W|$) stops ", IN" from matching ", India".
+_US_HINT = re.compile(
+    r"\b(?:usa|u\.s\.|united states)\b|,\s*(?:"
+    r"AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|"
+    r"MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|"
+    r"WA|WV|WI|WY|DC)(?=\W|$)", re.IGNORECASE)
+
+
+def location_excluded(location: str, patterns) -> bool:
+    """True if the location names an excluded country/city. Word-boundary
+    match so "india" doesn't hit "Indianapolis, IN", and anything carrying
+    a US state code or USA survives ("Dublin, OH" vs "Dublin"). Unknown/
+    empty locations are kept — better a stray ping than a missed posting."""
+    loc = (location or "").lower()
+    if not any(re.search(rf"\b{re.escape(p)}\b", loc) for p in patterns):
+        return False
+    return not _US_HINT.search(location or "")
+
+
 # ------------------------------------------------------------- ATS fetchers
 
 def fetch_greenhouse(board: str):
@@ -354,6 +374,15 @@ def main():
             if matches(j["title"], include_kw, exclude_kw):
                 j["agg"] = True
                 all_jobs.append(j)
+
+    # Drop postings in excluded locations (e.g. non-US) across all sources.
+    excl_loc = [p.lower() for p in cfg.get("exclude_locations", [])]
+    if excl_loc:
+        before = len(all_jobs)
+        all_jobs = [j for j in all_jobs
+                    if not location_excluded(j.get("location", ""), excl_loc)]
+        if before != len(all_jobs):
+            print(f"Location filter dropped {before - len(all_jobs)} posting(s).")
 
     # Dedupe against history. Direct-board postings dedupe by id only (two
     # real openings can share a title); aggregator entries are also dropped

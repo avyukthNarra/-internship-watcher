@@ -96,6 +96,7 @@ The first run after enabling baselines the channel (older messages are ignored);
 - Watch the channels; every message is one internship.
 - React **📌** to any job within 3 days of posting → within ~10 minutes it appears in "📌 *your name*'s Internship Tracker" in Notion with Status **Saved**. It must be the regular pushpin 📌 (search "pushpin" in the reaction picker), not 📍 — other emojis are ignored.
 - Update Status in Notion as you go: Saved → Applied → OA → Interview → Offer / Rejected.
+- Once a day the watcher re-checks every **Saved** row's link against its ATS; if the posting has been taken down, Status flips to **Closed** so you don't draft an application for a dead link. Rows at Applied or beyond are never touched (postings closing after you applied is normal). Aggregator links (jobright/simplify) can't be re-checked and are left alone.
 - **Applied to something?** Paste the job link into the **#applied** channel. Within ~10 minutes the bot scrapes the company/role and adds it to *your* tracker with Status **Applied**, then reacts ✅ (⚠️ means it saw no link in your message). Source shows as `applied`.
 
 ## Customizing
@@ -105,6 +106,7 @@ The first run after enabling baselines the channel (older messages are ignored);
 - **Tune the Simplify feed**: `simplify.terms` filters by season; `company_keywords` controls which companies from the giant feed you hear about; `max_age_days` ignores stale postings.
 - **Tune Jobright volume**: `jobright.repos` — drop `2026-Data-Analysis-Internship` to halve the firehose, or disable with `"enabled": false`. Repo names track Jobright's categories at [github.com/jobright-ai](https://github.com/jobright-ai); bump the year as they roll over.
 - **Narrow to ML/research only**: set `include_keywords` to e.g. `["machine learning intern", "research intern", "ml intern", "ai intern"]`.
+- **Location filter**: `exclude_locations` drops postings whose location names an excluded country/city (word-boundary matched; anything with a US state code or "USA" always survives, so "Dublin, OH" is kept while "Dublin, Ireland" is dropped). Empty/unknown locations are kept.
 
 ## State files (committed back by the workflow)
 

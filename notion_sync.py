@@ -55,7 +55,10 @@ STATUS_OPTIONS = [
     {"name": "Interview", "color": "orange"},
     {"name": "Offer", "color": "green"},
     {"name": "Rejected", "color": "red"},
+    {"name": "Closed", "color": "brown"},  # posting vanished before applying
 ]
+
+DEAD_SWEEP_INTERVAL = 24 * 3600  # re-check Saved rows once a day
 
 
 def _notion_headers():
@@ -503,6 +506,103 @@ def _sync_applied(state, bot_token, parent):
     return dirty
 
 
+# ---------------------------------------------------- dead-posting sweep
+
+def _config_boards():
+    """company name (lowercased) -> (ats, board slug) from config.json, so
+    custom-domain Greenhouse links ("careers.datadoghq.com/...?gh_jid=N")
+    can still be liveness-checked via the board API."""
+    try:
+        cfg = json.loads((ROOT / "config.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {c["name"].lower(): (c["ats"], c["board"])
+            for c in cfg.get("companies", [])}
+
+
+def _posting_open(url, company=None, boards=None):
+    """True if the ATS still lists the posting, False if it's gone, None
+    when the host can't be checked reliably (aggregator links, custom
+    career sites). Network errors are None — never mark a row Closed on
+    a hiccup."""
+    p = urllib.parse.urlparse(url)
+    host = p.hostname or ""
+    parts = [s for s in p.path.split("/") if s]
+    uuid = next((s for s in parts if _UUID_RE.fullmatch(s)), None)
+    q = urllib.parse.parse_qs(p.query)
+    try:
+        jid = q.get("gh_jid", [None])[0]
+        board = None
+        if host.endswith("greenhouse.io") and parts:
+            board = parts[0]
+            if not jid and "jobs" in parts:
+                i = parts.index("jobs")
+                jid = parts[i + 1] if i + 1 < len(parts) else None
+        elif jid and company:  # greenhouse job on a custom career domain
+            ats, slug = (boards or {}).get(company.lower(), (None, None))
+            if ats == "greenhouse":
+                board = slug
+        if board and jid:
+            r = requests.get(f"https://boards-api.greenhouse.io/v1/boards/"
+                             f"{board}/jobs/{jid}", timeout=15)
+            return {200: True, 404: False}.get(r.status_code)
+        if host.endswith("lever.co") and parts and uuid:
+            r = requests.get(f"https://api.lever.co/v0/postings/{parts[0]}"
+                             f"/{uuid}", timeout=15)
+            return {200: True, 404: False}.get(r.status_code)
+        if host.endswith("ashbyhq.com") and parts and uuid:
+            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{parts[0]}")
+            if d is None:
+                return None
+            return any(j.get("id") == uuid for j in d.get("jobs", []))
+    except requests.exceptions.RequestException:
+        pass
+    return None
+
+
+def _sweep_dead_postings(state):
+    """Once a day, flip tracker rows still at Saved whose posting has
+    disappeared from its ATS to Closed — so nobody drafts an application
+    for a dead link. Applied+ rows are left alone (postings closing after
+    you applied is normal). Returns True if state changed."""
+    now = time.time()
+    if now - state.get("dead_sweep_ts", 0) < DEAD_SWEEP_INTERVAL:
+        return False
+    state["dead_sweep_ts"] = now
+
+    boards = _config_boards()
+    closed = 0
+    for u in state.get("users", {}).values():
+        db = u.get("db")
+        if not db:
+            continue
+        cursor = None
+        while True:
+            payload = {"filter": {"property": "Status",
+                                  "select": {"equals": "Saved"}}}
+            if cursor:
+                payload["start_cursor"] = cursor
+            res = _notion("POST", f"/databases/{db}/query", payload)
+            if not res:
+                break
+            for page in res.get("results", []):
+                props = page.get("properties", {})
+                link = (props.get("Link") or {}).get("url")
+                comp = "".join(t.get("plain_text", "") for t in
+                               (props.get("Company") or {}).get("rich_text", []))
+                if link and _posting_open(link, comp, boards) is False:
+                    if _notion("PATCH", f"/pages/{page['id']}",
+                               {"properties": {"Status":
+                                               {"select": {"name": "Closed"}}}}):
+                        closed += 1
+            cursor = res.get("next_cursor")
+            if not res.get("has_more"):
+                break
+    if closed:
+        print(f"Notion: marked {closed} vanished posting(s) Closed.")
+    return True  # dead_sweep_ts advanced
+
+
 # ------------------------------------------------------------------- main
 
 def run(new_jobs):
@@ -556,6 +656,10 @@ def run(new_jobs):
 
     # 3) applied-channel links -> poster's tracker, Status=Applied
     if _sync_applied(state, bot_token, parent):
+        dirty = True
+
+    # 4) daily: mark Saved rows whose posting vanished as Closed
+    if _sweep_dead_postings(state):
         dirty = True
 
     if dirty:
