@@ -85,6 +85,13 @@ def norm_key(job) -> str:
     return "norm:" + re.sub(r"[^a-z0-9]+", "", (job["company"] + job["title"]).lower())
 
 
+def company_matches(company: str, keywords) -> bool:
+    """Word-boundary keyword match, so "unity" hits "Unity" but not
+    "Ivy Tech Community College", and "arm" not "Farmers"."""
+    c = company.lower()
+    return any(re.search(rf"\b{re.escape(k)}\b", c) for k in keywords)
+
+
 # ------------------------------------------------------------- ATS fetchers
 
 def fetch_greenhouse(board: str):
@@ -162,7 +169,7 @@ def fetch_simplify(cfg):
         if wanted_terms and not (wanted_terms & set(j.get("terms", []))):
             continue
         company = j.get("company_name", "")
-        if company_filter and not any(k in company.lower() for k in company_filter):
+        if company_filter and not company_matches(company, company_filter):
             continue
         out.append(
             {
@@ -384,7 +391,7 @@ def main():
             company = j["company"].lower()
             is_top = (src in ("greenhouse", "lever", "ashby", "simplify")
                       or company in top_names
-                      or any(k in company for k in top_kw))
+                      or company_matches(company, top_kw))
             (top if is_top else rest).append(j)
 
         msg_records = []

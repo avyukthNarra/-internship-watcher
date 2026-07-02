@@ -34,7 +34,6 @@
     { "name": "Datadog",         "ats": "greenhouse", "board": "datadog" },
     { "name": "Pure Storage",    "ats": "greenhouse", "board": "purestorage" },
     { "name": "Roblox",          "ats": "greenhouse", "board": "roblox" },
-    { "name": "Unity",           "ats": "greenhouse", "board": "unity3d" },
     { "name": "Epic Games",      "ats": "greenhouse", "board": "epicgames" },
     { "name": "Robinhood",       "ats": "greenhouse", "board": "robinhood" },
     { "name": "Affirm",          "ats": "greenhouse", "board": "affirm" },
@@ -51,7 +50,7 @@
     { "name": "xAI",             "ats": "greenhouse", "board": "xai" },
     { "name": "Stability AI",    "ats": "greenhouse", "board": "stabilityai" },
     { "name": "SambaNova",       "ats": "greenhouse", "board": "sambanovasystems" },
-    { "name": "Cerebras",        "ats": "greenhouse", "board": "cerebrassystems" },
+    { "name": "Cerebras",        "ats": "ashby",      "board": "cerebras" },
     { "name": "Glean",           "ats": "greenhouse", "board": "gleanwork" },
     { "name": "AssemblyAI",      "ats": "greenhouse", "board": "assemblyai" },
     { "name": "Waymo",           "ats": "greenhouse", "board": "waymo" },
@@ -92,7 +91,7 @@
     { "name": "Mercor",          "ats": "ashby",      "board": "mercor" },
     { "name": "Suno",            "ats": "ashby",      "board": "suno" },
     { "name": "Baseten",         "ats": "ashby",      "board": "baseten" },
-    { "name": "Fireworks AI",    "ats": "ashby",      "board": "fireworks-ai" },
+    { "name": "Fireworks AI",    "ats": "ashby",      "board": "fireworksai" },
     { "name": "Deel",            "ats": "ashby",      "board": "deel" },
     { "name": "Vanta",           "ats": "ashby",      "board": "vanta" },
     { "name": "Zip",             "ats": "ashby",      "board": "zip" },
@@ -179,7 +178,8 @@
       "uber", "airbnb", "linkedin", "salesforce", "adobe", "qualcomm", "amd",
       "snap", "tiktok", "bytedance", "github", "atlassian", "intel", "ibm",
       "oracle", "arm", "cisco", "capital one", "jpmorgan", "goldman sachs",
-      "morgan stanley", "groq", "grammarly", "runway", "boston dynamics"
+      "morgan stanley", "groq", "grammarly", "runway", "boston dynamics",
+      "unity"
     ]
   },
 

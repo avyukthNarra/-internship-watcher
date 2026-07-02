@@ -4,9 +4,11 @@
 A deployed internship-alert system for the owner (CS student, junior year fall 2026, hunting Summer 2027 AI/SWE internships). It runs on GitHub Actions every 10 minutes — there is no server. The README has full architecture and setup docs; read it first.
 
 ## Deployment facts (not in the README)
-- Live repo: `github.com/avyTamuGit/internship-watcher` (public — keeps Actions minutes unlimited). This directory is the checkout.
-- `gh` CLI is NOT installed on this machine. GitHub API calls (secrets, workflow dispatch, repo admin) use the token stored in the macOS keychain: extract with `git credential fill` (protocol=https, host=github.com). Pushing uses SSH (account `avyTamuGit`).
-- All five secrets are configured and verified working end-to-end (June 2026): `DISCORD_WEBHOOK_URL` (general channel), `DISCORD_WEBHOOK_URL_TOP` (top-companies channel), `DISCORD_BOT_TOKEN` (bot "IntershipTracker", reads 📌 reactions via REST only), `NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID` (page "Internship Hub").
+- Live repo: `github.com/avyukthNarra/-internship-watcher` (public, note the leading `-` in the name; account `avyukthNarra`). This directory is the checkout (check `git remote -v` before assuming).
+- The ORIGINAL deployment `github.com/avyTamuGit/internship-watcher` still exists but its watch.yml was disabled 2026-07-02 (its `DISCORD_BOT_TOKEN` went 401 on 2026-06-27 when the bot token was reset during the account migration, and it was double-posting every job to Discord and the Notion master DB). Don't re-enable it while the new repo runs.
+- `gh` CLI is NOT installed on this machine. The macOS keychain token (extract with `git credential fill`, protocol=https, host=github.com) belongs to the OLD account `avyTamuGit` — it can read the new public repo/Actions logs but NOT its secrets or admin. Pushing to the new repo uses SSH.
+- Secrets on the LIVE repo (verified working via Actions logs, July 2026): `DISCORD_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL_TOP`, `DISCORD_BOT_TOKEN` (bot "IntershipTracker", REST only), `NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID` (page "Internship Hub"), `APPLIED_CHANNEL_ID` (#applied channel). Both repos pointed at the SAME Notion databases (`notion_state.json` was copied at migration).
+- GitHub schedules are heavily throttled in practice: cron says `*/10` but runs fire every ~1–4.5 h (median ~2 h, measured over 200+ runs). This—not code—is why 📌 reactions take hours to reach Notion.
 - GitHub secrets are written via the API with libsodium sealed-box encryption (PyNaCl is installed for this).
 - Owner's Discord display name is Floof; their personal Notion tracker already exists.
 

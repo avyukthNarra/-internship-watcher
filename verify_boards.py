@@ -31,7 +31,7 @@ CANDIDATES = [
     ("Docker", "greenhouse", "docker"),
     ("GitHub", "greenhouse", "github"),
     ("Roblox", "greenhouse", "roblox"),
-    ("Unity", "greenhouse", "unity3d"),
+    # Unity left Greenhouse (Workday now) — covered via the Simplify feed
     ("Epic Games", "greenhouse", "epicgames"),
     ("Niantic", "greenhouse", "niantic"),
     ("Robinhood", "greenhouse", "robinhood"),
@@ -94,7 +94,7 @@ CANDIDATES = [
     # --- Lever ---
     ("Zoox", "lever", "zoox"),
     ("Weights & Biases", "lever", "wandb"),
-    ("Cerebras", "lever", "cerebras"),
+    ("Cerebras", "ashby", "cerebras"),
     ("Canva", "lever", "canva"),
     ("Atlassian", "lever", "atlassian"),
     ("Shield AI", "lever", "shieldai"),
@@ -115,7 +115,7 @@ CANDIDATES = [
     ("Mercor", "ashby", "mercor"),
     ("Suno", "ashby", "suno"),
     ("Baseten", "ashby", "baseten"),
-    ("Fireworks AI", "ashby", "fireworks-ai"),
+    ("Fireworks AI", "ashby", "fireworksai"),
     ("Replicate", "ashby", "replicate"),
     ("Deel", "ashby", "deel"),
     ("Vanta", "ashby", "vanta"),
