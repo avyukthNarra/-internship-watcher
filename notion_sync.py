@@ -631,6 +631,82 @@ def _sweep_dead_postings(state):
     return True  # dead_sweep_ts advanced
 
 
+# ----------------------------------------------------------- stats callout
+
+# Statuses that mean an application was actually sent (the "applied" total).
+APPLIED_STATUSES = ("Applied", "OA", "Interview", "Offer", "Rejected")
+
+
+def _status_counts(db_id):
+    """Tally of Status values across a tracker DB, or None if the query
+    failed (never zero the stats over a network blip)."""
+    counts = {}
+    cursor = None
+    while True:
+        payload = {"start_cursor": cursor} if cursor else {}
+        res = _notion("POST", f"/databases/{db_id}/query", payload)
+        if not res:
+            return None
+        for page in res.get("results", []):
+            sel = (page.get("properties", {}).get("Status") or {}).get("select")
+            if sel:
+                counts[sel["name"]] = counts.get(sel["name"], 0) + 1
+        cursor = res.get("next_cursor")
+        if not res.get("has_more"):
+            return counts
+
+
+def _stats_text(state):
+    lines = []
+    for u in state.get("users", {}).values():
+        if not u.get("db"):
+            continue
+        counts = _status_counts(u["db"])
+        if counts is None:
+            continue
+        total = sum(counts.get(s, 0) for s in APPLIED_STATUSES)
+        pipeline = " · ".join(f"{s} {counts.get(s, 0)}"
+                              for s in APPLIED_STATUSES)
+        lines.append(f"{u['name']}: {total} applied — {pipeline}"
+                     f" — Saved {counts.get('Saved', 0)}")
+    return "\n".join(lines)
+
+
+def _update_stats(state):
+    """Keep a 📊 callout on the parent page counting how many places each
+    member has applied to. Members flip Status by hand in Notion between
+    runs, so this re-queries the tracker DBs instead of trusting local
+    state. Returns True if state changed."""
+    text = _stats_text(state)
+    if not text:
+        return False
+    stamp = datetime.now(timezone.utc).strftime("%b %d, %H:%M UTC")
+    rich = [{"type": "text",
+             "text": {"content": f"{text}\nupdated {stamp}"}}]
+    block_id = state.get("stats_block")
+    if block_id:
+        if _notion("PATCH", f"/blocks/{block_id}",
+                   {"callout": {"rich_text": rich}}):
+            return False
+        b = _notion("GET", f"/blocks/{block_id}")
+        if b and not b.get("archived"):
+            return False  # update hiccuped but the block exists; retry next run
+    # First run, or the callout was deleted in Notion — (re)create it. The
+    # API can only append to the bottom of the page; drag it to the top
+    # once and every later run edits it in place.
+    res = _notion("PATCH",
+                  f"/blocks/{os.environ['NOTION_PARENT_PAGE_ID']}/children",
+                  {"children": [{"object": "block", "type": "callout",
+                                 "callout": {"rich_text": rich,
+                                             "icon": {"type": "emoji",
+                                                      "emoji": "📊"}}}]})
+    if res and res.get("results"):
+        state["stats_block"] = res["results"][0]["id"]
+        print("Notion: created 📊 stats callout on the hub page.")
+        return True
+    return False
+
+
 # ------------------------------------------------------------------- main
 
 def run(new_jobs):
@@ -686,6 +762,10 @@ def run(new_jobs):
 
     # 4) daily: mark Saved rows whose posting vanished as Closed
     if _sweep_dead_postings(state):
+        dirty = True
+
+    # 5) refresh the 📊 applied-count callout on the hub page
+    if _update_stats(state):
         dirty = True
 
     if dirty:
