@@ -184,6 +184,53 @@ CANDIDATES = [
     ("Voleon", "ashby", "voleon"),
     ("Liquid AI", "ashby", "liquid"),
     ("Sword Health", "lever", "swordhealth"),
+    # --- batch 3 (2026-07): broad "best SWE companies" expansion ---
+    # quant / trading
+    ("Citadel", "greenhouse", "citadel"),
+    ("Citadel Securities", "greenhouse", "citadelsecurities"),
+    ("SIG (Susquehanna)", "greenhouse", "sig"),
+    ("Belvedere Trading", "greenhouse", "belvederetrading"),
+    ("Chicago Trading Company", "greenhouse", "chicagotradingcompany"),
+    ("Wolverine Trading", "greenhouse", "wolverinetrading"),
+    ("XTX Markets", "greenhouse", "xtxmarkets"),
+    ("Flow Traders", "greenhouse", "flowtraders"),
+    ("Two Sigma (retry)", "greenhouse", "twosigma"),
+    # fintech
+    ("Rippling", "greenhouse", "rippling"),
+    ("Carta", "greenhouse", "carta"),
+    ("Mercury", "greenhouse", "mercury"),
+    ("SoFi", "greenhouse", "sofi"),
+    ("Adyen", "greenhouse", "adyen"),
+    ("Wise", "greenhouse", "transferwise"),
+    ("Gemini (crypto)", "greenhouse", "gemini"),
+    ("Ripple", "greenhouse", "ripple"),
+    ("Kraken", "lever", "kraken"),
+    # dev tools / infra
+    ("Sentry", "greenhouse", "sentry"),
+    ("Sourcegraph", "greenhouse", "sourcegraph"),
+    ("Grafana Labs", "greenhouse", "grafanalabs"),
+    ("Temporal", "greenhouse", "temporaltechnologies"),
+    ("dbt Labs", "greenhouse", "dbtlabsinc"),
+    ("Postman", "greenhouse", "postman"),
+    ("Cockroach Labs", "greenhouse", "cockroachlabs"),
+    ("Chronosphere", "greenhouse", "chronosphere"),
+    ("PostHog", "ashby", "posthog"),
+    ("Railway", "ashby", "railway"),
+    ("Render", "ashby", "render"),
+    ("Warp", "ashby", "warpdotdev"),
+    # security
+    ("Wiz", "greenhouse", "wizinc"),
+    ("Tailscale", "greenhouse", "tailscale"),
+    # autonomy / hardware / product
+    ("Applied Intuition", "greenhouse", "appliedintuition"),
+    ("Verkada", "greenhouse", "verkada"),
+    ("Zipline", "greenhouse", "flyzipline"),
+    ("Turo", "greenhouse", "turo"),
+    ("Strava", "lever", "strava"),
+    ("Quora", "ashby", "quora"),
+    ("Snap (retry)", "greenhouse", "snap"),
+    ("Groq (retry)", "greenhouse", "groqinc"),
+    ("Thinking Machines (retry)", "ashby", "thinkingmachines"),
 ]
 
 
