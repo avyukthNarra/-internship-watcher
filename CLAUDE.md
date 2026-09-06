@@ -1,22 +1,38 @@
 # CLAUDE.md — project context for future sessions
 
 ## What this is
-A deployed internship-alert system for the owner (CS student, junior year fall 2026, hunting Summer 2027 AI/SWE internships). It runs on GitHub Actions every 10 minutes — there is no server. The README has full architecture and setup docs; read it first.
 
-## Deployment facts (not in the README)
-- Live repo: `github.com/avyukthNarra/-internship-watcher` (public, note the leading `-` in the name; account `avyukthNarra`). This directory is the checkout (check `git remote -v` before assuming).
-- The ORIGINAL deployment `github.com/avyTamuGit/internship-watcher` still exists but its watch.yml was disabled 2026-07-02 (its `DISCORD_BOT_TOKEN` went 401 on 2026-06-27 when the bot token was reset during the account migration, and it was double-posting every job to Discord and the Notion master DB). Don't re-enable it while the new repo runs.
-- `gh` CLI is NOT installed on this machine. The macOS keychain token (extract with `git credential fill`, protocol=https, host=github.com) belongs to the OLD account `avyTamuGit` — it can read the new public repo/Actions logs but NOT its secrets or admin. Pushing to the new repo uses SSH.
-- Secrets on the LIVE repo (verified working via Actions logs, July 2026): `DISCORD_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL_TOP`, `DISCORD_BOT_TOKEN` (bot "IntershipTracker", REST only), `NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID` (page "Internship Hub"), `APPLIED_CHANNEL_ID` (#applied channel). Both repos pointed at the SAME Notion databases (`notion_state.json` was copied at migration).
-- GitHub schedules are heavily throttled in practice: cron says `*/10` but runs fire every ~1–4.5 h (median ~2 h, measured over 200+ runs). This—not code—is why 📌 reactions take hours to reach Notion.
-- GitHub secrets are written via the API with libsodium sealed-box encryption (PyNaCl is installed for this).
-- Owner's Discord display name is Floof; their personal Notion tracker already exists.
+An internship alert and application-tracking system. The main watcher reads 173 configured company boards plus SimplifyJobs and Jobright feeds, filters every source, and routes individual postings to Discord, email, and Notion. It can run from GitHub Actions or locally. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee.
 
-## Working rules learned in this project
-- **Never add a company board slug without verifying it live** — wrong slugs 404 silently forever. Add candidates to `verify_boards.py` and run it; only keep slugs that return jobs.
-- **Always `git pull --rebase` before committing** — the Actions bot commits `seen.json`/`message_map.json`/`notion_state.json` back every run, so the remote moves constantly.
-- Deleting `seen.json` re-alerts on every open posting (~450+ messages). Don't do it casually; >25 new jobs in a run falls back to a digest message (no 📌 tracking on digests).
-- The SimplifyJobs feed URL still points at the `Summer2026-Internships` repo, which carries Summer/Fall 2027 terms via its `terms` field. When SimplifyJobs eventually starts a `Summer2027-Internships` repo, update `SIMPLIFY_URL` in `watcher.py`. Same for the Jobright repo years in `config.json` (`jobright.repos`).
-- Jobright runs intern-list.com — they are the same source; don't add intern-list separately.
-- Instagram story scraping (zero2sudo) was evaluated and deliberately skipped: login-walled, datacenter IPs get blocked (won't work from Actions), ban risk, and his links duplicate sources already covered. Don't re-propose it unless the user asks.
-- Tokens were pasted into chat at setup time. If the user reports webhook spam or anything odd: rotate the Discord webhooks/bot token and Notion secret, then update the repo secrets via the API.
+The `internship-pinger` Cloudflare Worker is now in this repository. It triggers `watch.yml`, monitors completed main-branch runs, and sends hourly stale/failure warnings. Keep worker changes and watcher changes conceptually separate; its README and Node test are part of the repository.
+
+## Architecture facts
+
+- `watcher.py` fetches the configured Greenhouse, Lever, and Ashby boards and the enabled aggregate feeds.
+- Filtering applies to all sources. Top-level `terms` is the season filter for every source; `simplify.terms` is only a backward-compatible fallback when top-level `terms` is absent. Unknown season terms are retained by default and can be controlled with `keep_unknown_terms`; profile terms can be configured independently.
+- `job_utils.py` canonicalizes URLs while preserving meaningful query parameters. Exact job identities persist. Cross-source fuzzy fingerprints expire after `dedup_days` (default 30). Legacy `norm:` entries in state are ignored for matching, not removed.
+- `delivery_state.json` is the durable per-destination queue for Discord, email, and Notion. `max_discord_per_run` defaults to 50. Discord uses individual posts and keeps 📌 pins; there are no digest messages.
+- `health.json` records the last completed scan, source health, pending deliveries, and sync errors. A failed run leaves checkpointed work for retry.
+- `notion_state.json` durably tracks `pending_pins` and `pending_applied`. Applied rows set `Applied On` and a follow-up date; `follow_up_days` defaults to 14, supports per-profile overrides, and `0` disables the date. Stats report status counts and due follow-ups.
+- Notion upserts query existing rows by canonical job identity, including legacy rows, so existing history does not need a reseed migration. Previously stripped URLs are not automatically repairable.
+- Applied-link parsing may fetch HTML metadata after trying ATS APIs. Do not claim that the project never fetches HTML.
+- Config defaults include explicit `terms`, `keep_unknown_terms`, `dedup_days` 30, `max_discord_per_run` 50, `follow_up_days` 14, and an empty `profiles` object. Personal `profiles` are keyed by Discord user ID and may specify roles, companies, locations, terms, unknown-term handling, webhook environment variable, and follow-up interval. Profiles affect optional notification routing and follow-up settings; they do not gate explicit saved/applied actions.
+- `PERSONAL_WEBHOOKS_JSON` is a GitHub secret containing a JSON mapping from `DISCORD_WEBHOOK_*` variable names to URLs. The workflow imports it into the environment before running the watcher; `profile.webhook_env` must use that prefix. Keep examples redacted and do not add workflow changes for ordinary profile configuration.
+- A webhook timeout can represent an accepted Discord request, so duplicate Discord posts remain possible. Do not claim exactly-once delivery. Existing Notion-row scans reduce duplicates.
+
+## Deployment facts
+
+- Live repo: `github.com/avyukthNarra/-internship-watcher` (public, including the leading `-`; account `avyukthNarra`). Check `git remote -v` before assuming. This checkout may contain work in progress; do not imply a live rollout unless it has been verified.
+- The original `github.com/avyTamuGit/internship-watcher` deployment was disabled during the account migration. Do not re-enable it while the new deployment is the active path.
+- `gh` CLI is not installed on this machine. The old macOS keychain credential belongs to `avyTamuGit`; pushing to the new repo uses SSH.
+- Existing Notion history and state were carried across during migration. Do not reseed or delete state casually.
+- Secrets normally include Discord webhooks, `DISCORD_BOT_TOKEN`, `APPLIED_CHANNEL_ID`, `NOTION_TOKEN`, and `NOTION_PARENT_PAGE_ID`; SMTP secrets are optional.
+
+## Working rules
+
+- Verify every new ATS board slug with `verify_boards.py` before adding it. Wrong slugs can 404 silently.
+- Preserve `seen.json`, `delivery_state.json`, `message_map.json`, and `notion_state.json`. Deleting them can requeue or re-alert historical jobs.
+- The workflow always uploads state artifacts with seven-day retention. Persistence runs even after watcher failures and retries rebase/push up to three times; a rebase conflict leaves the artifact available for recovery.
+- Keep retries and state checkpoints durable. A run can fail after an external service accepted a request.
+- Do not add a new feed merely because it sounds useful; inspect whether it duplicates SimplifyJobs or Jobright.
+- Run `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. Keep setup and secret documentation useful for both GitHub Actions and local dry runs.

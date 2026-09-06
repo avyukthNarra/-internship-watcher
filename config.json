@@ -1052,5 +1052,16 @@
     "max_age_days": 7
   },
   "smtp_host": "smtp.gmail.com",
-  "smtp_port": 587
+  "smtp_port": 587,
+  "terms": [
+    "Fall 2026",
+    "Winter 2027",
+    "Spring 2027",
+    "Summer 2027"
+  ],
+  "keep_unknown_terms": true,
+  "dedup_days": 30,
+  "max_discord_per_run": 50,
+  "follow_up_days": 14,
+  "profiles": {}
 }

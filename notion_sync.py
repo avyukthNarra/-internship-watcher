@@ -30,10 +30,15 @@ import os
 import re
 import time
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import requests
+
+from job_utils import canonical_url, job_identity, load_json, save_json
+
+_PAGE_CACHE = {}
+SYNC_ERRORS = []
 
 ROOT = Path(__file__).parent
 STATE_PATH = ROOT / "notion_state.json"
@@ -70,6 +75,7 @@ def _notion_headers():
 
 
 def _notion(method, path, payload=None):
+    creating = method == "POST" and path in ("/pages", "/databases")
     for attempt in range(3):
         try:
             r = requests.request(method, f"{NOTION_API}{path}",
@@ -79,18 +85,29 @@ def _notion(method, path, payload=None):
             # Transient network blip (read timeout, connection reset). A single
             # slow Notion response must not crash the whole watcher run — back
             # off and retry, then give up like any other failed call.
+            SYNC_ERRORS.append("Notion " + type(e).__name__)
             print(f"  [warn] notion {path} -> {type(e).__name__}; "
                   f"retry {attempt + 1}/3")
+            if creating:
+                return None  # reconcile with a query before another create
             time.sleep(2 * (attempt + 1))
             continue
         if r.status_code == 429:
             time.sleep(float(r.headers.get("Retry-After", 2)))
             continue
+        if r.status_code >= 500:
+            SYNC_ERRORS.append(f"Notion HTTP {r.status_code}")
+            if creating:
+                return None
+            time.sleep(2 ** attempt)
+            continue
         if r.status_code >= 400:
+            SYNC_ERRORS.append(f"Notion HTTP {r.status_code}")
             print(f"  [warn] notion {path} -> HTTP {r.status_code}: "
                   f"{r.text[:200]}")
             return None
         return r.json()
+    SYNC_ERRORS.append("Notion retries exhausted")
     return None
 
 
@@ -105,6 +122,8 @@ def _create_db(parent_page_id, title, with_status):
     }
     if with_status:
         props["Status"] = {"select": {"options": STATUS_OPTIONS}}
+        props["Applied On"] = {"date": {}}
+        props["Follow-up"] = {"date": {}}
     d = _notion("POST", "/databases", {
         "parent": {"type": "page_id", "page_id": parent_page_id},
         "title": [{"type": "text", "text": {"content": title}}],
@@ -147,6 +166,7 @@ def _pin_reactors(bot_token, channel_id, message_id):
                              timeout=30)
         except requests.exceptions.RequestException as e:
             # A Discord hiccup on one message shouldn't abort the whole sync.
+            SYNC_ERRORS.append("Discord reaction fetch failed")
             print(f"  [warn] discord reactions -> {type(e).__name__}; skipping")
             return []
         if r.status_code == 429:
@@ -154,9 +174,11 @@ def _pin_reactors(bot_token, channel_id, message_id):
             continue
         if r.status_code != 200:
             if r.status_code != 404:  # 404 = message deleted, not noteworthy
+                SYNC_ERRORS.append(f"Discord reactions HTTP {r.status_code}")
                 print(f"  [warn] discord reactions -> HTTP {r.status_code}")
             return []
         return [u for u in r.json() if not u.get("bot")]
+    SYNC_ERRORS.append("Discord reactions retries exhausted")
     print("  [warn] discord reactions -> still rate-limited after retries")
     return []
 
@@ -186,16 +208,19 @@ def _channel_messages(bot_token, channel_id, after):
             r = requests.get(url, headers={"Authorization": f"Bot {bot_token}"},
                              timeout=30)
         except requests.exceptions.RequestException as e:
+            SYNC_ERRORS.append("Discord messages fetch failed")
             print(f"  [warn] discord messages -> {type(e).__name__}; skipping")
             return []
         if r.status_code == 429:
             time.sleep(min(float(r.headers.get("Retry-After", 1)), 5))
             continue
         if r.status_code != 200:
+            SYNC_ERRORS.append(f"Discord messages HTTP {r.status_code}")
             print(f"  [warn] discord messages -> HTTP {r.status_code}: "
                   f"{r.text[:200]}")
             return []
         return r.json()
+    SYNC_ERRORS.append("Discord messages retries exhausted")
     print("  [warn] discord messages -> still rate-limited after retries")
     return []
 
@@ -469,69 +494,146 @@ def _parse_job_from_url(url):
     return company.strip()[:200], role.strip()[:200], location[:200]
 
 
-def _sync_applied(state, bot_token, parent):
-    """Read new links in the applied channel and file them as Status=Applied
-    into the poster's own tracker. Returns True if state changed."""
+def _state():
+    state = load_json(STATE_PATH, {})
+    state.setdefault("users", {})
+    return state
+
+
+def _save(state):
+    save_json(STATE_PATH, state)
+
+
+def _pages(db):
+    if db in _PAGE_CACHE:
+        return _PAGE_CACHE[db]
+    pages, cursor = [], None
+    while True:
+        result = _notion("POST", f"/databases/{db}/query",
+                         {"start_cursor": cursor} if cursor else {})
+        if result is None:
+            return None  # never create duplicates after a failed lookup
+        pages.extend(result.get("results", []))
+        if not result.get("has_more"):
+            _PAGE_CACHE[db] = pages
+            return pages
+        cursor = result["next_cursor"]
+
+
+def _ensure_tracker(u, parent, days):
+    if not u.get("db"):
+        u["db"] = _create_db(parent, f"📌 {u['name']}'s Internship Tracker", True)
+        if u["db"]:
+            u["tracker_schema"] = 1
+    if not u.get("db"):
+        return False
+    if not u.get("tracker_schema"):
+        result = _notion("PATCH", f"/databases/{u['db']}", {"properties": {
+            "Applied On": {"date": {}}, "Follow-up": {"date": {}}}})
+        if not result:
+            return False
+        u["tracker_schema"] = 1
+    u["follow_up_days"] = days
+    return True
+
+
+def _upsert_row(db, job, status=None, follow_up_days=14):
+    """Find legacy rows by canonical identity; never downgrade pipeline status."""
+    pages = _pages(db)
+    if pages is None:
+        return None
+    identity = job_identity(job)
+    page = next((p for p in pages if job_identity({
+        "id": p["id"], "url": (p.get("properties", {}).get("Link") or {}).get("url") or ""
+    }) == identity), None)
+    if page is None:
+        page = _add_row(db, job, status)
+        if not page:
+            _PAGE_CACHE.pop(db, None)  # an ambiguous write requires a fresh lookup
+            return None
+        pages.append(page)
+    props = page.get("properties", {})
+    current = (props.get("Status", {}).get("select") or {}).get("name")
+    if status == "Applied" and current not in ("OA", "Interview", "Offer", "Rejected"):
+        today = datetime.now(timezone.utc).date()
+        applied = (props.get("Applied On", {}).get("date") or {}).get("start") or today.isoformat()
+        due = (datetime.fromisoformat(applied.replace("Z", "+00:00")).date()
+               + timedelta(days=follow_up_days)).isoformat()
+        changes = {"Status": {"select": {"name": "Applied"}},
+                   "Applied On": {"date": {"start": applied}},
+                   "Follow-up": {"date": {"start": due} if follow_up_days > 0 else None}}
+        if current != "Applied" or not props.get("Applied On", {}).get("date"):
+            updated = _notion("PATCH", f"/pages/{page['id']}", {"properties": changes})
+            if not updated:
+                return None
+            page["properties"] = {**props, **changes}
+    return page
+
+
+def log_master(job):
+    state = _state()
+    if not state.get("master_db"):
+        state["master_db"] = _create_db(os.environ["NOTION_PARENT_PAGE_ID"],
+                                        "All Internship Postings", False)
+        _save(state)
+    if not state.get("master_db"):
+        return False
+    return bool(_upsert_row(state["master_db"], job))
+
+
+def _sync_applied(state, bot_token, parent, cfg=None):
+    cfg = cfg or {}
     channel_id = os.environ.get("APPLIED_CHANNEL_ID")
     if not (bot_token and channel_id):
         return False
-
-    after = state.get("applied_after")
-    if not after:
-        # First run: baseline to now so we don't backfill old channel chatter
-        # as applications. Only links posted from here on are processed.
+    if not state.get("applied_after"):
         state["applied_after"] = _snowflake_now()
-        print("Applied sync: baselined channel; tracking new posts from now.")
+        _save(state)
         return True
-
-    msgs = _channel_messages(bot_token, channel_id, after)
-    if not msgs:
-        return False
-    msgs.sort(key=lambda m: int(m["id"]))  # process oldest -> newest
-
-    dirty = False
-    filed = 0
-    max_id = int(after)
-    for m in msgs:
-        mid = m["id"]
-        max_id = max(max_id, int(mid))
-        author = m.get("author", {})
-        if author.get("bot"):
+    pending = state.setdefault("pending_applied", {})
+    # Checkpoint each fetched batch before advancing its cursor.
+    for _ in range(10):
+        msgs = _channel_messages(bot_token, channel_id, state["applied_after"])
+        if not msgs:
+            break
+        for m in sorted(msgs, key=lambda m: int(m["id"])):
+            author = m.get("author", {})
+            if not author.get("bot"):
+                urls = list(dict.fromkeys(match.group(0).rstrip(").,]")
+                                          for match in URL_RE.finditer(m.get("content", ""))))
+                if not urls:
+                    _react(bot_token, channel_id, m["id"], WARN_EMOJI)
+                for index, url in enumerate(urls):
+                    pending.setdefault(f"{m['id']}:{index}", {
+                        "mid": m["id"], "uid": author["id"], "url": canonical_url(url),
+                        "name": author.get("global_name") or author.get("username") or author["id"]})
+        state["applied_after"] = str(max(int(m["id"]) for m in msgs))
+        _save(state)
+        if len(msgs) < 100:
+            break
+    for key, rec in list(pending.items()):
+        u = state["users"].setdefault(rec["uid"], {"name": rec["name"], "jobs": []})
+        days = cfg.get("profiles", {}).get(rec["uid"], {}).get("follow_up_days", cfg.get("follow_up_days", 14))
+        if not _ensure_tracker(u, parent, days):
+            _save(state)
             continue
-        url = _extract_url(m.get("content", ""))
-        if not url:
-            _react(bot_token, channel_id, mid, WARN_EMOJI)  # no link found
-            continue
-
-        uid = author["id"]
-        name = author.get("global_name") or author.get("username") or uid
-        u = state["users"].setdefault(uid, {"name": name, "jobs": []})
-        applied = u.setdefault("applied", [])
-        norm = url.split("?")[0]
-        if norm in applied:
-            _react(bot_token, channel_id, mid, CHECK_EMOJI)
-            continue
-        if not u.get("db"):
-            u["db"] = _create_db(
-                parent, f"📌 {name}'s Internship Tracker", with_status=True)
-            dirty = True
-            print(f"Notion: created tracker for {name}.")
-
-        company, role, location = _parse_job_from_url(url)
-        job = {"id": f"applied:{mid}", "company": company, "title": role,
-               "url": norm, "location": location}
-        if u.get("db") and _add_row(u["db"], job, status="Applied"):
-            applied.append(norm)
-            _react(bot_token, channel_id, mid, CHECK_EMOJI)
-            filed += 1
-            dirty = True
-
-    if str(max_id) != after:
-        state["applied_after"] = str(max_id)
-        dirty = True
-    if filed:
-        print(f"Notion: filed {filed} applied link(s).")
-    return dirty
+        _save(state)
+        if not rec.get("job"):
+            company, role, location = _parse_job_from_url(rec["url"])
+            rec["job"] = {"id": "applied:" + key, "company": company, "title": role,
+                          "url": rec["url"], "location": location}
+            _save(state)
+        page = _upsert_row(u["db"], rec["job"], "Applied", days)
+        if page:
+            u.setdefault("pages", {})[job_identity(rec["job"])] = page["id"]
+            applied = u.setdefault("applied", [])
+            if rec["url"] not in applied:
+                applied.append(rec["url"])
+            del pending[key]
+            _save(state)
+            if not any(r["mid"] == rec["mid"] for r in pending.values()):
+                _react(bot_token, channel_id, rec["mid"], CHECK_EMOJI)
+    return True
 
 
 # ---------------------------------------------------- dead-posting sweep
@@ -596,7 +698,7 @@ def _sweep_dead_postings(state):
     now = time.time()
     if now - state.get("dead_sweep_ts", 0) < DEAD_SWEEP_INTERVAL:
         return False
-    state["dead_sweep_ts"] = now
+    complete = True
 
     boards = _config_boards()
     closed = 0
@@ -612,6 +714,7 @@ def _sweep_dead_postings(state):
                 payload["start_cursor"] = cursor
             res = _notion("POST", f"/databases/{db}/query", payload)
             if not res:
+                complete = False
                 break
             for page in res.get("results", []):
                 props = page.get("properties", {})
@@ -623,12 +726,16 @@ def _sweep_dead_postings(state):
                                {"properties": {"Status":
                                                {"select": {"name": "Closed"}}}}):
                         closed += 1
+                    else:
+                        complete = False
             cursor = res.get("next_cursor")
             if not res.get("has_more"):
                 break
     if closed:
         print(f"Notion: marked {closed} vanished posting(s) Closed.")
-    return True  # dead_sweep_ts advanced
+    if complete:
+        state["dead_sweep_ts"] = now
+    return True
 
 
 # ----------------------------------------------------------- stats callout
@@ -638,22 +745,29 @@ APPLIED_STATUSES = ("Applied", "OA", "Interview", "Offer", "Rejected")
 
 
 def _status_counts(db_id):
-    """Tally of Status values across a tracker DB, or None if the query
-    failed (never zero the stats over a network blip)."""
+    pages = _pages(db_id)
+    if pages is None:
+        return None
     counts = {}
-    cursor = None
-    while True:
-        payload = {"start_cursor": cursor} if cursor else {}
-        res = _notion("POST", f"/databases/{db_id}/query", payload)
-        if not res:
-            return None
-        for page in res.get("results", []):
-            sel = (page.get("properties", {}).get("Status") or {}).get("select")
-            if sel:
-                counts[sel["name"]] = counts.get(sel["name"], 0) + 1
-        cursor = res.get("next_cursor")
-        if not res.get("has_more"):
-            return counts
+    for page in pages:
+        status = (page.get("properties", {}).get("Status", {}).get("select") or {}).get("name")
+        if status:
+            counts[status] = counts.get(status, 0) + 1
+    return counts
+
+
+def _follow_ups(db):
+    today = datetime.now(timezone.utc).date().isoformat()
+    due = []
+    for page in _pages(db) or []:
+        props = page.get("properties", {})
+        status = (props.get("Status", {}).get("select") or {}).get("name")
+        date = (props.get("Follow-up", {}).get("date") or {}).get("start")
+        if status == "Applied" and date and date[:10] <= today:
+            role = "".join(t.get("plain_text", t.get("text", {}).get("content", ""))
+                           for t in props.get("Role", {}).get("title", []))
+            due.append(role or "Applied position")
+    return due
 
 
 def _stats_text(state):
@@ -669,6 +783,9 @@ def _stats_text(state):
                               for s in APPLIED_STATUSES)
         lines.append(f"{u['name']}: {total} applied — {pipeline}"
                      f" — Saved {counts.get('Saved', 0)}")
+        due = _follow_ups(u["db"])
+        if due:
+            lines.append(f"⏰ {u['name']}: {len(due)} follow-up(s) due — " + "; ".join(due[:5]))
     return "\n".join(lines)
 
 
@@ -682,14 +799,14 @@ def _update_stats(state):
         return False
     stamp = datetime.now(timezone.utc).strftime("%b %d, %H:%M UTC")
     rich = [{"type": "text",
-             "text": {"content": f"{text}\nupdated {stamp}"}}]
+             "text": {"content": f"{text[:1800]}\nupdated {stamp}"}}]
     block_id = state.get("stats_block")
     if block_id:
         if _notion("PATCH", f"/blocks/{block_id}",
                    {"callout": {"rich_text": rich}}):
             return False
         b = _notion("GET", f"/blocks/{block_id}")
-        if b and not b.get("archived"):
+        if b is None or not b.get("archived"):
             return False  # update hiccuped but the block exists; retry next run
     # First run, or the callout was deleted in Notion — (re)create it. The
     # API can only append to the bottom of the page; drag it to the top
@@ -709,64 +826,44 @@ def _update_stats(state):
 
 # ------------------------------------------------------------------- main
 
-def run(new_jobs):
-    state = {}
-    if STATE_PATH.exists():
-        state = json.loads(STATE_PATH.read_text())
-    state.setdefault("users", {})
+def run(new_jobs, cfg=None):
+    SYNC_ERRORS.clear()
+    cfg = cfg or load_json(ROOT / "config.json", {})
+    for job in new_jobs:
+        if not log_master(job):
+            raise RuntimeError("Master log delivery failed")
+    state = _state()
     parent = os.environ["NOTION_PARENT_PAGE_ID"]
-    dirty = False
-
-    # 1) master log
-    if not state.get("master_db"):
-        state["master_db"] = _create_db(
-            parent, "All Internship Postings", with_status=False)
-        dirty = True
-    if state.get("master_db"):
-        for j in new_jobs:
-            _add_row(state["master_db"], j)
-        if new_jobs:
-            print(f"Notion: logged {len(new_jobs)} posting(s) to master db.")
-
-    # 2) personal trackers from 📌 reactions
     bot_token = os.environ.get("DISCORD_BOT_TOKEN")
-    msg_map = {}
-    if MSG_MAP_PATH.exists():
-        msg_map = json.loads(MSG_MAP_PATH.read_text())
-    if bot_token and msg_map:
-        filed = 0
-        for mid in _pinned_message_ids(bot_token, msg_map):
-            rec = msg_map[mid]
-            for user in _pin_reactors(bot_token, rec["cid"], mid):
-                uid = user["id"]
-                name = user.get("global_name") or user.get("username") or uid
-                u = state["users"].setdefault(uid, {"name": name, "jobs": []})
-                if not u.get("db"):
-                    u["db"] = _create_db(
-                        parent, f"📌 {name}'s Internship Tracker",
-                        with_status=True)
-                    dirty = True
-                    print(f"Notion: created tracker for {name}.")
-                job = rec["job"]
-                if u.get("db") and job["id"] not in u["jobs"]:
-                    if _add_row(u["db"], job, status="Saved"):
-                        u["jobs"].append(job["id"])
-                        dirty = True
-                        filed += 1
-        if filed:
-            print(f"Notion: filed {filed} 📌-tracked job(s).")
-
-    # 3) applied-channel links -> poster's tracker, Status=Applied
-    if _sync_applied(state, bot_token, parent):
-        dirty = True
-
-    # 4) daily: mark Saved rows whose posting vanished as Closed
-    if _sweep_dead_postings(state):
-        dirty = True
-
-    # 5) refresh the 📊 applied-count callout on the hub page
-    if _update_stats(state):
-        dirty = True
-
-    if dirty:
-        STATE_PATH.write_text(json.dumps(state, indent=1))
+    try:
+        msg_map = load_json(MSG_MAP_PATH, {})
+        pending = state.setdefault("pending_pins", {})
+        if bot_token and msg_map:
+            for mid in _pinned_message_ids(bot_token, msg_map):
+                rec = msg_map[mid]
+                for user in _pin_reactors(bot_token, rec["cid"], mid):
+                    uid = user["id"]
+                    u = state["users"].setdefault(uid, {
+                        "name": user.get("global_name") or user.get("username") or uid, "jobs": []})
+                    if rec["job"]["id"] not in u["jobs"]:
+                        pending.setdefault(uid + ":" + rec["job"]["id"], {"uid": uid, "job": rec["job"]})
+            _save(state)
+        for key, rec in list(pending.items()):
+            u = state["users"][rec["uid"]]
+            days = cfg.get("profiles", {}).get(rec["uid"], {}).get("follow_up_days", cfg.get("follow_up_days", 14))
+            if _ensure_tracker(u, parent, days):
+                _save(state)
+                page = _upsert_row(u["db"], rec["job"], "Saved")
+                if page:
+                    u.setdefault("pages", {})[job_identity(rec["job"])] = page["id"]
+                    u["jobs"].append(rec["job"]["id"])
+                    del pending[key]
+                    _save(state)
+        _sync_applied(state, bot_token, parent, cfg)
+        _sweep_dead_postings(state)
+        _PAGE_CACHE.clear()  # fresh statuses after the closing sweep
+        _update_stats(state)
+    finally:
+        _save(state)
+    if state.get("pending_applied") or state.get("pending_pins") or SYNC_ERRORS:
+        raise RuntimeError("Notion/Discord sync needs retry: " + "; ".join(sorted(set(SYNC_ERRORS))))

@@ -1,0 +1,7 @@
+name = "internship-pinger"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+workers_dev = false
+
+[triggers]
+crons = ["*/10 * * * *"]

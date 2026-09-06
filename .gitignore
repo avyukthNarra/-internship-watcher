@@ -3,3 +3,9 @@ zip-contents/
 __pycache__/
 .DS_Store
 .claude/
+
+.wrangler/
+node_modules/
+.env
+.env.*
+!.env.example
