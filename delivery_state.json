@@ -439,6 +439,7 @@
   "533a38185793eb68f425f81c69aa445bbc8cd80ba8e5218f5f2c8eb3c0e16b00": 1788758466.1404016,
   "534dac647687f79306a6de47728164ab5ec81689381f62033b888df9f7cf6ef3": 1789010459.6229408,
   "5368a02cd1cf0a2b8757121e43737e0b79bdb810698e801063c492c8a613da84": 1788909676.2375631,
+  "5387c7f7acedcc8e1fe800e6fa0ce7e68f3ac8f6a6a47c166576f25dca56a452": 1789120267.5433667,
   "538a35ea2ea17854b8ba577011644dc994aba167cab8ebce05121599cd18eb80": 1788996065.4352927,
   "53c2999f59c3e57d0171a43656e0cce39b6eb7a8e5bb073a38688aa2d0cfc71e": 1788727268.2011304,
   "53e52698d93c8c9e969ae66b18e4cb3b55e291b572cddddbc32671c77de10d70": 1788882129.728355,
@@ -739,6 +740,7 @@
   "8e5ac84de2e0bb3409ec6af5028c4a6e811acb42f153b948f34635f374735379": 1788848473.8409576,
   "8e740c5dbcdd3bb6414fc1bfced1c89ea6b1638e6811de00d9b5289efd936475": 1788762072.2524307,
   "8e8f78a41d116ba92f95100fd8067c38b3fc6d26b29b98af885ce69870abbe0e": 1788727268.2011304,
+  "8f01f6cbc19ced27c3a098f2370d2d8bd09325ca63c82f3fa68cdc170869747d": 1789120267.5433667,
   "8f3765945a98eca7b155c64c3701c55f3b547c844dbad16b54e1d373b1711ce0": 1789119667.9897034,
   "8f9a65e927746908177f497024a4b238177b94c734638207403100b140c4978b": 1788762072.2524307,
   "901a78efdf5f9a79e912743a7b711242bedbe9a30fcfe0365ee56d4ae9b1c5f6": 1788727268.2011304,
@@ -2795,6 +2797,10 @@
   "url:https://jobright.ai/jobs/info/6aa3b3ed626f9945308b2865": "jobright:6aa3b3ed626f9945308b2865",
   "url:https://jobright.ai/jobs/info/6aa3b4315c11cce360365c35": "jobright:6aa3b4315c11cce360365c35",
   "url:https://jobright.ai/jobs/info/6aa3b524959a10d7230d3635": "jobright:6aa3b524959a10d7230d3635",
+  "url:https://jobright.ai/jobs/info/6aa3b801c5a856ac7e33b2db": "jobright:6aa3b801c5a856ac7e33b2db",
+  "url:https://jobright.ai/jobs/info/6aa3b8b3959a10d7230d3820": "jobright:6aa3b8b3959a10d7230d3820",
+  "url:https://jobright.ai/jobs/info/6aa3b925c5a856ac7e33b380": "jobright:6aa3b925c5a856ac7e33b380",
+  "url:https://jobright.ai/jobs/info/6aa3b9a94238ea18d430dbbf": "jobright:6aa3b9a94238ea18d430dbbf",
   "url:https://jobs.bytedance.com/en/position/7678449088065997109/detail": "simplify:98ba4abf-1726-45e5-a03c-c711dfb81c84",
   "url:https://jobs.bytedance.com/en/position/7678450462765254965/detail": "simplify:a35fbd54-2c09-4c0e-8677-4b9065708400",
   "url:https://jobs.bytedance.com/en/position/7678451067500529925/detail": "simplify:3b02c249-20be-43f2-8ef1-e09f6b887db6",
@@ -10160,6 +10166,10 @@
   "jobright:6aa3b3ed626f9945308b2865",
   "jobright:6aa3b4315c11cce360365c35",
   "jobright:6aa3b524959a10d7230d3635",
+  "jobright:6aa3b801c5a856ac7e33b2db",
+  "jobright:6aa3b8b3959a10d7230d3820",
+  "jobright:6aa3b925c5a856ac7e33b380",
+  "jobright:6aa3b9a94238ea18d430dbbf",
   "lever:mistral:2df63313-09ee-4a1a-993d-712d65c1de8a",
   "lever:mistral:426ef8c0-eb26-4004-a690-f33c62b445a7",
   "lever:mistral:9f23edb8-c2eb-4144-b6de-4b1bc4aaee26",
@@ -15537,216 +15547,5 @@
   "simplify:ff726677-73d4-416f-9342-25617fee706e",
   "simplify:ffc80c46-0710-4acb-82cc-c1e1d640674c"
  ],
- "pending": {
-  "jobright:6aa37ac9b47caa3aec72c42e": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL_TOP"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Zipline",
-    "id": "jobright:6aa37ac9b47caa3aec72c42e",
-    "location": "South San Francisco, CA, United States",
-    "title": "Data Analytics Intern (Spring 2027)",
-    "url": "https://jobright.ai/jobs/info/6aa37ac9b47caa3aec72c42e"
-   }
-  },
-  "jobright:6aa380354233a2201a2b19fa": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL_TOP"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Zipline",
-    "id": "jobright:6aa380354233a2201a2b19fa",
-    "location": "South San Francisco, CA, United States",
-    "title": "Data Analytics Intern (Summer 2027)",
-    "url": "https://jobright.ai/jobs/info/6aa380354233a2201a2b19fa"
-   }
-  },
-  "jobright:6aa383345c11cce3603646c2": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Liberty Mutual Insurance",
-    "id": "jobright:6aa383345c11cce3603646c2",
-    "location": "Boston, MA, United States",
-    "title": "Catastrophe Modeling & GIS Research Co-op (January - June 2027)",
-    "url": "https://jobright.ai/jobs/info/6aa383345c11cce3603646c2"
-   }
-  },
-  "jobright:6aa38657959a10d7230d2212": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "RiverSource",
-    "id": "jobright:6aa38657959a10d7230d2212",
-    "location": "Minneapolis, MN, United States",
-    "title": "Data Analytics & AI Intern - RiverSource",
-    "url": "https://jobright.ai/jobs/info/6aa38657959a10d7230d2212"
-   }
-  },
-  "jobright:6aa3879b5c11cce360364940": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Manheim Dallas-Fort Worth",
-    "id": "jobright:6aa3879b5c11cce360364940",
-    "location": "Atlanta, GA, United States",
-    "title": "Data Governance and Management Intern - Summer 2027",
-    "url": "https://jobright.ai/jobs/info/6aa3879b5c11cce360364940"
-   }
-  },
-  "jobright:6aa387c9959a10d7230d22d7": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "American Modern Insurance Group",
-    "id": "jobright:6aa387c9959a10d7230d22d7",
-    "location": "Cincinnati metropolitan area, United States",
-    "title": "Data and Analytics Intern",
-    "url": "https://jobright.ai/jobs/info/6aa387c9959a10d7230d22d7"
-   }
-  },
-  "jobright:6aa38897c5a856ac7e339e01": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "USAA",
-    "id": "jobright:6aa38897c5a856ac7e339e01",
-    "location": "San Antonio, TX, United States",
-    "title": "Future Leaders Program - Data Intern",
-    "url": "https://jobright.ai/jobs/info/6aa38897c5a856ac7e339e01"
-   }
-  },
-  "jobright:6aa38962c5a856ac7e339e56": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Dominion Energy",
-    "id": "jobright:6aa38962c5a856ac7e339e56",
-    "location": "Richmond, VA, United States",
-    "title": "Intern - Associate Business Intelligence Analyst (Design COE) (RICHMOND, VA, US, 23219)",
-    "url": "https://jobright.ai/jobs/info/6aa38962c5a856ac7e339e56"
-   }
-  },
-  "jobright:6aa38beb4233a2201a2b1fe2": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Humana",
-    "id": "jobright:6aa38beb4233a2201a2b1fe2",
-    "location": "Louisville, KY, United States",
-    "title": "Graduate Analytics Internship \u2013 Summer 2027",
-    "url": "https://jobright.ai/jobs/info/6aa38beb4233a2201a2b1fe2"
-   }
-  },
-  "jobright:6aa390dd959a10d7230d26e9": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Walmart",
-    "id": "jobright:6aa390dd959a10d7230d26e9",
-    "location": "Bentonville, AR, United States",
-    "title": "Summer 2027 Intern: Intern: Sr Data Science",
-    "url": "https://jobright.ai/jobs/info/6aa390dd959a10d7230d26e9"
-   }
-  },
-  "jobright:6aa3a184626f9945308b2049": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Volvo Group",
-    "id": "jobright:6aa3a184626f9945308b2049",
-    "location": "Greensboro, NC, United States",
-    "title": "Co-op: Engineering, Data Analyst (Spring 2027)",
-    "url": "https://jobright.ai/jobs/info/6aa3a184626f9945308b2049"
-   }
-  },
-  "jobright:6aa3a2fcc5a856ac7e33a9b4": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Ameriprise Financial Services, LLC",
-    "id": "jobright:6aa3a2fcc5a856ac7e33a9b4",
-    "location": "Minneapolis, MN, United States",
-    "title": "Data Analytics & AI Intern - RiverSource",
-    "url": "https://jobright.ai/jobs/info/6aa3a2fcc5a856ac7e33a9b4"
-   }
-  },
-  "jobright:6aa3a77d5c11cce3603656c2": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Munich Re",
-    "id": "jobright:6aa3a77d5c11cce3603656c2",
-    "location": "Amelia, OH, United States",
-    "title": "Data and Analytics Intern",
-    "url": "https://jobright.ai/jobs/info/6aa3a77d5c11cce3603656c2"
-   }
-  },
-  "jobright:6aa3b2125c11cce360365b52": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Canadian Solar Inc.",
-    "id": "jobright:6aa3b2125c11cce360365b52",
-    "location": "Mesquite, TX, United States",
-    "title": "Data Analysis Specialist Intern",
-    "url": "https://jobright.ai/jobs/info/6aa3b2125c11cce360365b52"
-   }
-  },
-  "jobright:6aa3b524959a10d7230d3635": {
-   "created": 1789119667.9897034,
-   "destinations": [
-    "discord:DISCORD_WEBHOOK_URL"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Covestro",
-    "id": "jobright:6aa3b524959a10d7230d3635",
-    "location": "Pittsburgh, PA, United States",
-    "title": "Digital Analyst & Project Management Intern",
-    "url": "https://jobright.ai/jobs/info/6aa3b524959a10d7230d3635"
-   }
-  }
- }
+ "pending": {}
 }
