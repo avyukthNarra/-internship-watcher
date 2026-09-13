@@ -54,6 +54,8 @@ def matches(title: str, include_kw, exclude_kw) -> bool:
 
 
 SOURCE_HEALTH = {}
+# Boards move ATS or blip; only fail the run once a source stays down this long.
+SOURCE_ALERT_AFTER = 5 * 3600
 
 
 def fetch(url, as_text=False):
@@ -530,20 +532,35 @@ def main(argv=None):
     except Exception as exc:
         sync_error = type(exc).__name__
         print(f"[error] Sync failed: {sync_error}; checkpointed work will retry.")
+    for key, source in current_sources.items():
+        if source.get("ok"):
+            source.pop("failing_since", None)
+        else:
+            source["failing_since"] = (source.get("failing_since")
+                                       or old_sources.get(key, {}).get("failing_since") or now)
     failures = sum(not v.get("ok") for v in current_sources.values())
+    stale = sorted(k for k, v in current_sources.items()
+                   if not v.get("ok") and now - v["failing_since"] >= SOURCE_ALERT_AFTER)
     health = {"last_completed_scan": now, "sources": current_sources,
               "successful_sources": len(current_sources) - failures, "failed_sources": failures,
+              "stale_failed_sources": len(stale),
               "matching_jobs": len(all_jobs), "new_jobs": len(new_jobs),
               "pending_deliveries": sum(len(v["destinations"]) for v in ledger["pending"].values()),
               "sync_error": sync_error}
     save_json(health_path, health)
-    summary = (f"Sources: {health['successful_sources']} OK, {failures} failed; "
+    summary = (f"Sources: {health['successful_sources']} OK, {failures} failed "
+               f"({len(stale)} down {SOURCE_ALERT_AFTER // 3600}h+); "
                f"pending deliveries: {health['pending_deliveries']}; sync: {sync_error or 'OK'}")
+    for key, source in sorted(current_sources.items()):
+        if not source.get("ok"):
+            hours = (now - source["failing_since"]) / 3600
+            summary += f"\n- {key}: {source.get('error')} for {hours:.1f}h"
     print(summary)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as stream:
             stream.write(summary + "\n")
-    return int(bool(failures or sync_error or health["pending_deliveries"]))
+    # Short source outages are recorded in health.json but don't fail the run.
+    return int(bool(stale or sync_error or health["pending_deliveries"]))
 
 
 if __name__ == "__main__":

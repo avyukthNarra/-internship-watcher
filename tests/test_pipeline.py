@@ -97,7 +97,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(health["failed_sources"], 0)
         self.assertEqual(health["new_jobs"], 0)
 
-    def test_failed_source_returns_one_after_successful_delivery_is_persisted(self):
+    def test_failed_source_within_grace_period_returns_zero_after_delivery_is_persisted(self):
         job = {
             "id": "greenhouse:acme:17",
             "company": "Acme",
@@ -114,15 +114,37 @@ class PipelineTests(unittest.TestCase):
         )
         with contexts[0], contexts[1], contexts[2], contexts[3], contexts[4], contexts[5]:
             self.assertEqual(watcher.main([]), 0)
-            self.assertEqual(watcher.main([]), 1)
+            self.assertEqual(watcher.main([]), 0)
 
         state = json.loads((self.root / "delivery_state.json").read_text())
         self.assertEqual(state["pending"], {})
         self.assertIn(job["id"], state["known_ids"])
         health = json.loads((self.root / "health.json").read_text())
         self.assertEqual(health["failed_sources"], 1)
+        self.assertEqual(health["stale_failed_sources"], 0)
         self.assertEqual(health["pending_deliveries"], 0)
         self.assertEqual(notify.call_count, 1)
+
+    def test_source_down_past_alert_window_fails_run_and_recovery_clears_it(self):
+        url = "https://boards-api.greenhouse.io/v1/boards/acme/jobs"
+        started = watcher.time.time() - watcher.SOURCE_ALERT_AFTER - 60
+        (self.root / "health.json").write_text(json.dumps({"sources": {
+            url: {"ok": False, "error": "HTTP 404", "failing_since": started}}}))
+        notify = Mock(return_value=([], set()))
+        contexts = self.run_with_source(
+            [self.response(404), self.response()],
+            notify, Mock(return_value=True),
+        )
+        with contexts[0], contexts[1], contexts[2], contexts[3], contexts[4], contexts[5]:
+            self.assertEqual(watcher.main([]), 1)
+            health = json.loads((self.root / "health.json").read_text())
+            self.assertEqual(health["stale_failed_sources"], 1)
+            self.assertEqual(health["sources"][url]["failing_since"], started)
+            watcher.main([])
+
+        health = json.loads((self.root / "health.json").read_text())
+        self.assertTrue(health["sources"][url]["ok"])
+        self.assertNotIn("failing_since", health["sources"][url])
 
     def test_mixed_sources_deliver_healthy_jobs_and_report_failed_source(self):
         self.cfg["companies"] = [
@@ -154,7 +176,7 @@ class PipelineTests(unittest.TestCase):
             patch.object(watcher.time, "sleep"),
         )
         with contexts[0], contexts[1], contexts[2], contexts[3], contexts[4], contexts[5]:
-            self.assertEqual(watcher.main([]), 1)
+            self.assertEqual(watcher.main([]), 0)
 
         state = json.loads((self.root / "delivery_state.json").read_text())
         self.assertEqual(state["pending"], {})
