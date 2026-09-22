@@ -1,0 +1,78 @@
+name: Source Doctor
+
+# Claude investigates a job-board source that has stayed down and opens a PR
+# with the fix. Dispatched by watch.yml when it opens a "source-down" issue;
+# adding the label to an issue by hand also runs it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Number of the source-down issue"
+        required: true
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: source-doctor-${{ inputs.issue || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  investigate:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'source-down'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ISSUE: ${{ inputs.issue || github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Read,Edit,Grep,Glob,WebFetch,WebSearch,Bash(curl:*),Bash(python:*),Bash(python3:*),Bash(git:*),Bash(gh issue:*),Bash(gh pr:*)"
+          prompt: |
+            You are maintaining the internship watcher in this repository. Read CLAUDE.md first.
+
+            Issue #${{ env.ISSUE }} in ${{ github.repository }} reports a job-board source that
+            has been failing for hours. Read it with `gh issue view ${{ env.ISSUE }}`.
+
+            Work out why the source fails and fix config.json:
+            1. Find the company's entry in config.json and reproduce the failure with curl.
+            2. Find where the company posts jobs now. Try slug variants on Greenhouse
+               (boards-api.greenhouse.io/v1/boards/<slug>/jobs), Lever
+               (api.lever.co/v0/postings/<slug>?mode=json) and Ashby
+               (api.ashbyhq.com/posting-api/job-board/<slug>), and check the company's
+               careers page for links to its applicant tracking system.
+            3. If the company moved to a supported ATS, verify the new slug returns jobs
+               (for example with a small one-off check modeled on verify_boards.py) and
+               update the entry. If it moved to an unsupported system (Workday, etc.) or
+               stopped hiring, remove the entry; the SimplifyJobs and Jobright feeds still
+               cover it. If the failure is transient (5xx, timeouts) and the endpoint works
+               now, change nothing.
+            4. If you changed config.json, run `python -m unittest discover -s tests`, then
+               create branch `source-doctor/issue-${{ env.ISSUE }}`, commit, push it, and open
+               a PR with `gh pr create` whose body says `Fixes #${{ env.ISSUE }}` and lists the
+               evidence (URLs checked and their status codes).
+            5. Finish with `gh issue comment ${{ env.ISSUE }}` summarizing what you found
+               and linking the PR if there is one.
+
+            Rules: never push to main, never edit seen.json, delivery_state.json,
+            message_map.json, notion_state.json or health.json, and change nothing
+            outside config.json unless the watcher code itself is clearly at fault.

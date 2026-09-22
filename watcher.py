@@ -22,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -54,8 +55,11 @@ def matches(title: str, include_kw, exclude_kw) -> bool:
 
 
 SOURCE_HEALTH = {}
-# Boards move ATS or blip; only fail the run once a source stays down this long.
+# Boards move ATS or blip; a source down this long is reported as a GitHub issue.
 SOURCE_ALERT_AFTER = 5 * 3600
+# One dead board gets an issue, not a failed run; this many at once is an outage.
+MAX_STALE_SOURCES = 5
+SOURCE_ISSUE_LABEL = "source-down"
 
 
 def fetch(url, as_text=False):
@@ -439,6 +443,51 @@ def deliver(ledger, cfg, msg_map, checkpoint):
     checkpoint()
 
 
+def github_api(method, path, payload=None):
+    """Call the repo's GitHub API from Actions; returns JSON or None when unavailable."""
+    token, repo = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY")
+    if not (token and repo):
+        return None
+    try:
+        r = requests.request(method, f"https://api.github.com/repos/{repo}/{path}", json=payload,
+                             headers={**HEADERS, "Authorization": f"Bearer {token}",
+                                      "Accept": "application/vnd.github+json"}, timeout=TIMEOUT)
+    except requests.RequestException as exc:
+        print(f"  [warn] GitHub {method} {path} -> {type(exc).__name__}")
+        return None
+    if not r.ok:
+        print(f"  [warn] GitHub {method} {path} -> HTTP {r.status_code}")
+        return None
+    return r.json() if r.content else {}
+
+
+def source_company(url, cfg):
+    segments = set(urlparse(url).path.split("/"))
+    return next((f"{c['name']} ({c.get('ats')}:{c['board']})" for c in cfg.get("companies", [])
+                 if c.get("board") in segments), url)
+
+
+def open_source_issue(url, source, cfg, now):
+    """Open one issue for a source that stayed down; returns the issue number."""
+    hours = (now - source["failing_since"]) / 3600
+    last = source.get("last_success")
+    last = datetime.fromtimestamp(last, timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if last else "never"
+    issue = github_api("POST", "issues", {
+        "title": f"Source down: {source_company(url, cfg)}",
+        "labels": [SOURCE_ISSUE_LABEL],
+        "body": (f"The watcher has failed to read this source for {hours:.1f}h.\n\n"
+                 f"- URL: {url}\n- Error: {source.get('error')}\n- Last success: {last}\n\n"
+                 "Runs keep succeeding without it. This issue closes automatically "
+                 "if the source recovers."),
+    })
+    return issue and issue.get("number")
+
+
+def close_source_issue(number):
+    github_api("POST", f"issues/{number}/comments", {"body": "Source recovered; closing."})
+    github_api("PATCH", f"issues/{number}", {"state": "closed", "state_reason": "completed"})
+
+
 def validate_config(cfg):
     if not isinstance(cfg, dict) or not isinstance(cfg.get("companies"), list):
         raise ValueError("config.json must contain a companies list")
@@ -535,12 +584,25 @@ def main(argv=None):
     for key, source in current_sources.items():
         if source.get("ok"):
             source.pop("failing_since", None)
+            if old_sources.get(key, {}).get("issue"):
+                close_source_issue(old_sources[key]["issue"])
         else:
             source["failing_since"] = (source.get("failing_since")
                                        or old_sources.get(key, {}).get("failing_since") or now)
+            if old_sources.get(key, {}).get("issue"):
+                source["issue"] = old_sources[key]["issue"]
     failures = sum(not v.get("ok") for v in current_sources.values())
     stale = sorted(k for k, v in current_sources.items()
                    if not v.get("ok") and now - v["failing_since"] >= SOURCE_ALERT_AFTER)
+    opened = []
+    for key in stale:
+        source = current_sources[key]
+        if not source.get("issue") and (number := open_source_issue(key, source, cfg, now)):
+            source["issue"] = number
+            opened.append(number)
+    if opened and os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
+            stream.write(f"source_issues={' '.join(map(str, opened))}\n")
     health = {"last_completed_scan": now, "sources": current_sources,
               "successful_sources": len(current_sources) - failures, "failed_sources": failures,
               "stale_failed_sources": len(stale),
@@ -559,8 +621,8 @@ def main(argv=None):
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as stream:
             stream.write(summary + "\n")
-    # Short source outages are recorded in health.json but don't fail the run.
-    return int(bool(stale or sync_error or health["pending_deliveries"]))
+    # Individual dead sources are tracked as issues; only a broad outage fails the run.
+    return int(bool(len(stale) > MAX_STALE_SOURCES or sync_error or health["pending_deliveries"]))
 
 
 if __name__ == "__main__":

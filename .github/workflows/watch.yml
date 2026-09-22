@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write             # to commit seen.json back
+  issues: write               # to open/close "source-down" issues
+  actions: write              # to dispatch source-doctor.yml
 
 concurrency:
   group: watcher              # never run two watchers at once (seen.json races)
@@ -27,7 +29,9 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Run watcher
+        id: watcher
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_WEBHOOK_URL_TOP: ${{ secrets.DISCORD_WEBHOOK_URL_TOP }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
@@ -39,6 +43,16 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           PERSONAL_WEBHOOKS_JSON: ${{ secrets.PERSONAL_WEBHOOKS_JSON }}
         run: python watcher.py
+
+      # Issues opened with GITHUB_TOKEN don't trigger workflows, so dispatch explicitly.
+      - name: Dispatch source doctor
+        if: always() && steps.watcher.outputs.source_issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for issue in ${{ steps.watcher.outputs.source_issues }}; do
+            gh workflow run source-doctor.yml --ref main -f issue="$issue" || true
+          done
 
       - name: Persist state
         if: always()

@@ -102,7 +102,7 @@ These files are runtime state. GitHub Actions persists them after each run; loca
 | `notion_state.json` | Notion database IDs, users, applied cursor, `pending_applied`, and `pending_pins` |
 | `health.json` | Last completed scan, source successes/failures, matching and new counts, pending deliveries, and sync errors |
 
-`health.json` is also the run's operational summary: a source failure, pending delivery, or Notion sync error is reported explicitly and retried through durable state. A failing source records `failing_since` and only fails the run (and triggers failure alerts) once it has been down for 5 hours; pending deliveries and sync errors fail the run immediately.
+`health.json` is also the run's operational summary: a source failure, pending delivery, or Notion sync error is reported explicitly and retried through durable state. A failing source records `failing_since`. Once it has been down for 5 hours the watcher opens a `source-down` GitHub issue (closed automatically on recovery) and dispatches the `source-doctor.yml` workflow, where Claude investigates and opens a PR updating `config.json`; the run itself still succeeds. More than 5 stale sources at once, pending deliveries, and sync errors fail the run. The source doctor needs a `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or `ANTHROPIC_API_KEY` repository secret.
 
 ## Local run
 

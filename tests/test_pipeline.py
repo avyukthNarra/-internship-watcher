@@ -125,7 +125,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(health["pending_deliveries"], 0)
         self.assertEqual(notify.call_count, 1)
 
-    def test_source_down_past_alert_window_fails_run_and_recovery_clears_it(self):
+    def test_source_down_past_alert_window_is_reported_without_failing_run(self):
         url = "https://boards-api.greenhouse.io/v1/boards/acme/jobs"
         started = watcher.time.time() - watcher.SOURCE_ALERT_AFTER - 60
         (self.root / "health.json").write_text(json.dumps({"sources": {
@@ -136,7 +136,7 @@ class PipelineTests(unittest.TestCase):
             notify, Mock(return_value=True),
         )
         with contexts[0], contexts[1], contexts[2], contexts[3], contexts[4], contexts[5]:
-            self.assertEqual(watcher.main([]), 1)
+            self.assertEqual(watcher.main([]), 0)
             health = json.loads((self.root / "health.json").read_text())
             self.assertEqual(health["stale_failed_sources"], 1)
             self.assertEqual(health["sources"][url]["failing_since"], started)
