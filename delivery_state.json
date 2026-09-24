@@ -442,6 +442,7 @@
   "1e3b1824998bd45856fa7b19ea93bf0783ab91b1b5425108e4dad2b707973834": 1788727268.2011304,
   "1e433b5c2dadd2bad96d0a50cd35caef7ec99633a252fd2067763428b59dc935": 1789693264.1071358,
   "1e51bef4b456dbfff8d699e46ba913023c34f794435e5c0fa035674dbdf6c2fc": 1789668720.4856389,
+  "1e60fcdaf00f3923cf4fdac7b9530f8c6d454e0b8c065283db037f632878a028": 1790215267.8089483,
   "1e717e00ba463173ac3b1d3516368b28168c92d6ac961829960a6eda57bd8328": 1790092870.6232927,
   "1e9c33d0b7dff332dff736e093469773255b512be6cba431c12da840557d7b95": 1788727268.2011304,
   "1ea39ebbd626d1134cd5b1e65c24cedf67963cee65b1cc4818cdae6d31cbf3f2": 1790182875.6483994,
@@ -2374,6 +2375,7 @@
   "b828865e79ec4f78a1e676dbe5cbc262b43300426fb399777af8ca819f8b2e3c": 1790057464.1747584,
   "b82b69060c6fccac88ec4e9a774929af5ee83d8097a7bcbd072b41c3321535b9": 1789536074.0073156,
   "b8300334cf68ab7a378b63bc1c8ee62cd4faeab70f421190036afef579405c00": 1789775460.5880415,
+  "b83e25e89df435423dd888c324174a65210cd71d94daa88654ae823b4a649f64": 1790215267.8089483,
   "b84090ec1c6a21577dbecafe74c95e710e4ef675209edfe77c4ef89698492650": 1788727268.2011304,
   "b86c4908120267de87e027dd9ecb84f6b2cc6566e3fc992612ca9db07d1fd785": 1789387276.1338458,
   "b872a685b9f15e8441d4ef42f3f2f61d8811798df2239b87451b12c13106a50d": 1789450896.7040656,
@@ -7189,7 +7191,10 @@
   "url:https://jobright.ai/jobs/info/6ab450d3d2f5fbd604be2d8e": "jobright:6ab450d3d2f5fbd604be2d8e",
   "url:https://jobright.ai/jobs/info/6ab451540e0ae54eeea47f09": "jobright:6ab451540e0ae54eeea47f09",
   "url:https://jobright.ai/jobs/info/6ab4523564816213f2d9890d": "jobright:6ab4523564816213f2d9890d",
+  "url:https://jobright.ai/jobs/info/6ab4582a7bd0813713317596": "jobright:6ab4582a7bd0813713317596",
   "url:https://jobright.ai/jobs/info/6ab45c130e0ae54eeea484e8": "jobright:6ab45c130e0ae54eeea484e8",
+  "url:https://jobright.ai/jobs/info/6ab4639555e9168cf5ea63ba": "jobright:6ab4639555e9168cf5ea63ba",
+  "url:https://jobright.ai/jobs/info/6ab4641dd2f5fbd604be353a": "jobright:6ab4641dd2f5fbd604be353a",
   "url:https://jobs.bytedance.com/en/position/7678449088065997109/detail": "simplify:98ba4abf-1726-45e5-a03c-c711dfb81c84",
   "url:https://jobs.bytedance.com/en/position/7678450462765254965/detail": "simplify:a35fbd54-2c09-4c0e-8677-4b9065708400",
   "url:https://jobs.bytedance.com/en/position/7678451067500529925/detail": "simplify:3b02c249-20be-43f2-8ef1-e09f6b887db6",
@@ -16519,7 +16524,10 @@
   "jobright:6ab450d3d2f5fbd604be2d8e",
   "jobright:6ab451540e0ae54eeea47f09",
   "jobright:6ab4523564816213f2d9890d",
+  "jobright:6ab4582a7bd0813713317596",
   "jobright:6ab45c130e0ae54eeea484e8",
+  "jobright:6ab4639555e9168cf5ea63ba",
+  "jobright:6ab4641dd2f5fbd604be353a",
   "lever:mistral:2df63313-09ee-4a1a-993d-712d65c1de8a",
   "lever:mistral:426ef8c0-eb26-4004-a690-f33c62b445a7",
   "lever:mistral:9f23edb8-c2eb-4144-b6de-4b1bc4aaee26",
@@ -22008,5 +22016,21 @@
   "simplify:ff726677-73d4-416f-9342-25617fee706e",
   "simplify:ffc80c46-0710-4acb-82cc-c1e1d640674c"
  ],
- "pending": {}
+ "pending": {
+  "jobright:6ab4639555e9168cf5ea63ba": {
+   "attempts": 1,
+   "created": 1790215267.8089483,
+   "destinations": [
+    "notion"
+   ],
+   "job": {
+    "agg": true,
+    "company": "Zekelman Industries",
+    "id": "jobright:6ab4639555e9168cf5ea63ba",
+    "location": "Troy, MI, United States",
+    "title": "Intern, Business Intelligence",
+    "url": "https://jobright.ai/jobs/info/6ab4639555e9168cf5ea63ba"
+   }
+  }
+ }
 }
