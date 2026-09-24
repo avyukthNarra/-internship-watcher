@@ -826,6 +826,7 @@
   "3e6cd8ad7882a56fdfd73bb8eed65b8ef071e95c2684563eab6f0be5df86bf5b": 1789119667.9897034,
   "3e7ff77ca13ab5aa04482b5cd6acf2c96276dcefc49db0dff1b88b25343b7616": 1790206278.2832358,
   "3e824717fe975d9273a347a40989188a8d1c21d4b301b4b0b62e96cb6ec70adf": 1789771258.5475214,
+  "3ecd79f0309322402c61ea280df997c8efdfde77b53ce0402e9a3adc47020843": 1790215402.723251,
   "3edf4c383ded3eeb6c74cae11d028e7b35816d6919d862a48f54258ccaf6b3da": 1788762072.2524307,
   "3f0ae6b1f2d574f497db95483e72ee5924abb40d7add2aac23d53e03207c7317": 1789746661.2471275,
   "3f170eea11bc0b4af8ead3a8d3e35a0474acc42a10389d018c2760d7ddcd7501": 1789007451.7166169,
@@ -2038,6 +2039,7 @@
   "9a121f259da691d73d78c78b4b9b9ddc2803e47cca7c9ecec885e39d072d078e": 1790191860.6940026,
   "9a46227f2bb06775317cb1d74b8869c30ad64e92b09c0559b9aaa89689be9037": 1789604476.0004404,
   "9abc15bf36edf0ed6cc2cca241ee1166e0fd9b3d3d053d57b68be3648b6ec5dc": 1790083863.8256748,
+  "9acebefebe86c481224ed84d8b1e5aac2728e6aed1a7b3b8e381a29b5c46abe2": 1790215402.723251,
   "9adbf84b5cddab615525f6b393ae8aa4f02845e5cd7bf33d757810d18d659627": 1789600276.6614442,
   "9ae16d753a9f317263416d41c0190bc3aaf7df68c75b4b2d79b82347ce86e01f": 1788906067.410554,
   "9ae650b6b6b9cfee1a1d0bf5da0d8132c235c25a4b5ba8187f44e8ec69124cf0": 1788727268.2011304,
@@ -7312,6 +7314,8 @@
   "url:https://www.tesla.com/careers/search/job/284275": "simplify:74cf1c10-8e9a-4066-a47c-024ca7ecbf4b",
   "url:https://www.tesla.com/careers/search/job/284278": "simplify:1a1a2a75-10ef-4a52-9850-702ee859dc3d",
   "url:https://www.tesla.com/careers/search/job/284436": "simplify:d21b7b94-4ec6-4789-9893-f5bcb8a6d2b8",
+  "url:https://www.tesla.com/careers/search/job/284448": "simplify:d0f85828-c8e8-42fb-a47d-3f46e18db9d1",
+  "url:https://www.tesla.com/careers/search/job/284489": "simplify:a16efc0d-108f-4ae3-81a2-aaf96195f8ce",
   "url:https://www.tesla.com/careers/search/job/284593": "simplify:be11dc29-6925-4c06-99a2-79e488a51c35"
  },
  "known_ids": [
@@ -21769,6 +21773,7 @@
   "simplify:a0411f20-98d8-4615-8a27-21bcd5d82808",
   "simplify:a0ec26fd-db0f-4eb4-9bed-73b9409cabc5",
   "simplify:a0f6cef3-bbc6-4223-9b6a-33ff06368b58",
+  "simplify:a16efc0d-108f-4ae3-81a2-aaf96195f8ce",
   "simplify:a1e3987b-628f-4fd3-9b89-8bb755a6bd26",
   "simplify:a2743d30-b180-4a83-8edf-a8092e35fd0f",
   "simplify:a355430e-bb97-47ee-9229-434cec3e3a6c",
@@ -21903,6 +21908,7 @@
   "simplify:d01ebc03-05a8-45ae-90cb-8456c83c83e2",
   "simplify:d02657b4-87d2-4593-8b0e-d4bfb5b50cce",
   "simplify:d0e6095d-b7d9-4b98-9b30-5bc4f60fed04",
+  "simplify:d0f85828-c8e8-42fb-a47d-3f46e18db9d1",
   "simplify:d1143c35-1cc7-4e60-a5c6-4e223abab7d0",
   "simplify:d1768aee-f240-4353-b609-278b04785c95",
   "simplify:d1e4eec6-2b6b-4b94-a986-8a25822c4666",
@@ -22016,21 +22022,5 @@
   "simplify:ff726677-73d4-416f-9342-25617fee706e",
   "simplify:ffc80c46-0710-4acb-82cc-c1e1d640674c"
  ],
- "pending": {
-  "jobright:6ab4639555e9168cf5ea63ba": {
-   "attempts": 1,
-   "created": 1790215267.8089483,
-   "destinations": [
-    "notion"
-   ],
-   "job": {
-    "agg": true,
-    "company": "Zekelman Industries",
-    "id": "jobright:6ab4639555e9168cf5ea63ba",
-    "location": "Troy, MI, United States",
-    "title": "Intern, Business Intelligence",
-    "url": "https://jobright.ai/jobs/info/6ab4639555e9168cf5ea63ba"
-   }
-  }
- }
+ "pending": {}
 }
