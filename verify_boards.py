@@ -147,7 +147,7 @@ CANDIDATES = [
     ("Lightning AI", "greenhouse", "lightningai"),
     ("Snorkel AI", "greenhouse", "snorkelai"),
     ("Tenstorrent", "greenhouse", "tenstorrent"),
-    ("Wayve", "greenhouse", "wayve"),
+    ("Wayve", "ashby", "wayve"),
     ("Black Forest Labs", "ashby", "black-forest-labs"),
     ("Cohere Health", "greenhouse", "coherehealth"),
     ("HeyGen", "greenhouse", "heygen"),
@@ -212,7 +212,7 @@ CANDIDATES = [
     ("Grafana Labs", "greenhouse", "grafanalabs"),
     ("Temporal", "ashby", "temporal"),
     ("dbt Labs", "greenhouse", "dbtlabsinc"),
-    ("Postman", "greenhouse", "postman"),
+    # Postman moved to Workday; covered through the aggregate feeds.
     ("Cockroach Labs", "greenhouse", "cockroachlabs"),
     ("Chronosphere", "greenhouse", "chronosphere"),
     ("PostHog", "ashby", "posthog"),
@@ -259,14 +259,19 @@ def check(c):
     return (name, ats, slug, n)
 
 
-with ThreadPoolExecutor(max_workers=16) as ex:
-    results = list(ex.map(check, CANDIDATES))
+def main():
+    with ThreadPoolExecutor(max_workers=16) as ex:
+        results = list(ex.map(check, CANDIDATES))
 
-ok = [r for r in results if r[3] >= 0]
-fail = [r for r in results if r[3] < 0]
-print(f"--- VERIFIED ({len(ok)}) ---")
-for name, ats, slug, n in sorted(ok, key=lambda r: (r[1], r[0])):
-    print(f"  {ats:10s} {slug:25s} {name:25s} {n} jobs")
-print(f"--- FAILED ({len(fail)}) ---")
-for name, ats, slug, n in sorted(fail, key=lambda r: (r[1], r[0])):
-    print(f"  {ats:10s} {slug:25s} {name}")
+    ok = [r for r in results if r[3] >= 0]
+    fail = [r for r in results if r[3] < 0]
+    print(f"--- VERIFIED ({len(ok)}) ---")
+    for name, ats, slug, n in sorted(ok, key=lambda r: (r[1], r[0])):
+        print(f"  {ats:10s} {slug:25s} {name:25s} {n} jobs")
+    print(f"--- FAILED ({len(fail)}) ---")
+    for name, ats, slug, n in sorted(fail, key=lambda r: (r[1], r[0])):
+        print(f"  {ats:10s} {slug:25s} {name}")
+
+
+if __name__ == "__main__":
+    main()

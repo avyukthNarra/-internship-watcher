@@ -2,13 +2,14 @@
 
 ## What this is
 
-An internship alert and application-tracking system. The main watcher reads 173 configured company boards plus SimplifyJobs and Jobright feeds, filters every source, and routes individual postings to Discord, email, and Notion. It can run from GitHub Actions or locally. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee.
+An internship alert and application-tracking system. The main watcher reads configured company boards plus SimplifyJobs and Jobright feeds, filters every source, and routes individual postings to Discord, email, and Notion. It can run from GitHub Actions or locally. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee.
 
 The `internship-pinger` Cloudflare Worker is now in this repository. It triggers `watch.yml`, monitors completed main-branch runs, and sends hourly stale/failure warnings. Keep worker changes and watcher changes conceptually separate; its README and Node test are part of the repository.
 
 ## Architecture facts
 
 - `watcher.py` fetches the configured Greenhouse, Lever, and Ashby boards and the enabled aggregate feeds.
+- Wayve uses Ashby (`wayve`). Postman moved to Workday and is covered through the aggregate feeds, including an explicit SimplifyJobs company keyword; do not restore its dead Greenhouse entry or claim direct Workday coverage.
 - Filtering applies to all sources. Top-level `terms` is the season filter for every source; `simplify.terms` is only a backward-compatible fallback when top-level `terms` is absent. Unknown season terms are retained by default and can be controlled with `keep_unknown_terms`; profile terms can be configured independently.
 - `job_utils.py` canonicalizes URLs while preserving meaningful query parameters. Exact job identities persist. Cross-source fuzzy fingerprints expire after `dedup_days` (default 30). Legacy `norm:` entries in state are ignored for matching, not removed.
 - `delivery_state.json` is the durable per-destination queue for Discord, email, and Notion. `max_discord_per_run` defaults to 50. Discord uses individual posts and keeps 📌 pins; there are no digest messages.

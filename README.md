@@ -6,7 +6,7 @@ This repository monitors internship postings and routes matching jobs to Discord
 
 Each watcher run:
 
-1. Fetches the 173 company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs and Jobright feeds.
+1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs and Jobright feeds.
 2. Applies the title, location, and season filters to every source. The top-level `terms` list applies to all sources; `simplify.terms` remains a backward-compatible fallback only when top-level `terms` is absent. `keep_unknown_terms` controls whether a posting with no recognizable season term is retained and defaults to keeping unknown terms.
 3. Identifies postings by ATS identity or canonical URL. Known campaign parameters are removed, while other URL query parameters are preserved because they may identify the job. Exact identities remain known indefinitely. Cross-source fuzzy fingerprints are retained for `dedup_days` (30 days by default). Legacy `norm:` entries in state are ignored for matching and are not removed.
 4. Places each new job into `delivery_state.json` with its individual destinations. Discord notifications are individual posts and retain the 📌 instruction. There are no digest messages. `max_discord_per_run` defaults to 50; undelivered destinations remain queued for a later run.
@@ -66,7 +66,9 @@ With no delivery credentials, or with `python watcher.py --dry-run`, the watcher
 
 ## Configuration
 
-`config.json` contains the 173 `companies` entries plus explicit defaults for `terms`, `keep_unknown_terms`, `dedup_days` (30), `max_discord_per_run` (50), `follow_up_days` (14), and `profiles` (an empty object unless configured). It also contains the SimplifyJobs and Jobright feed settings. Add a board only after verifying its slug with `verify_boards.py`; unsupported or stale slugs can return 404. The configured `exclude_locations` list uses word-boundary matching and keeps locations that clearly contain a US state or USA. Empty or unknown locations are retained.
+`config.json` contains the `companies` entries plus explicit defaults for `terms`, `keep_unknown_terms`, `dedup_days` (30), `max_discord_per_run` (50), `follow_up_days` (14), and `profiles` (an empty object unless configured). It also contains the SimplifyJobs and Jobright feed settings. Add a board only after verifying its slug with `verify_boards.py`; unsupported or stale slugs can return 404. The configured `exclude_locations` list uses word-boundary matching and keeps locations that clearly contain a US state or USA. Empty or unknown locations are retained.
+
+Wayve is fetched directly from its Ashby board. Postman moved to Workday, which the watcher does not fetch directly; it is included in the SimplifyJobs company filter and remains eligible for Jobright routing. Postman alerts depend on those feeds publishing matching jobs within the configured age window.
 
 For profiles, use Discord user IDs as keys, for example:
 
