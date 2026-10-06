@@ -16,6 +16,19 @@ The watcher checkpoints intent before external delivery and uses atomic JSON wri
 
 The repository also contains the `internship-pinger` Cloudflare Worker. It triggers the `watch.yml` workflow and monitors completed main-branch runs, sending hourly stale or failure warnings. See [`internship-pinger/README.md`](internship-pinger/README.md) for its setup.
 
+The Python modules have separate responsibilities:
+
+| Module | Responsibility |
+| --- | --- |
+| `watcher.py` | Discover, filter, deduplicate, checkpoint, and deliver postings |
+| `job_feeds.py` | Shared board endpoints and feed validation |
+| `project_config.py` | Validate configuration, import personal webhook settings, and resolve defaults |
+| `source_health.py` | Calculate scan health, format summaries, and choose the run's exit status |
+| `notion_sync.py` | Master log, durable pin/applied queues, posting liveness, and tracker statistics |
+| `job_utils.py` | Job identities, preferences, and atomic JSON storage |
+
+Notion sync queues observed pins and application links before processing them. Collection and delivery are separate steps so a failed write can retry even after the original message is gone. A recovered request does not count as a sync failure; ambiguous page/database creates still require a fresh lookup before retrying.
+
 ## Notion and Discord workflow
 
 The shared Notion database is **All Internship Postings**. A member reacts 📌 to an individual Discord job post; the bot reads reactions through the Discord REST API and creates or updates that member's tracker. Pin work is durable in `pending_pins`.
@@ -113,7 +126,19 @@ python watcher.py --dry-run
 python watcher.py
 ```
 
+Check the boards in the actual configuration, a selected company, or a new candidate:
+
+```bash
+python verify_boards.py
+python verify_boards.py --company Wayve
+python verify_boards.py --candidate ashby wayve
+```
+
+The verifier uses the same endpoints and feed-shape checks as the watcher, reports HTTP/schema errors, and exits nonzero if any board fails. It does not change runtime state or send notifications. Feed options and personal preferences are validated before a watcher scan begins.
+
 Run the tests with `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. The workflow always uploads the five state files as a recovery artifact with seven-day retention. Its persistence step always runs, makes up to three rebase/push attempts, and preserves the artifact if a rebase conflict prevents pushing. Do not assume the scheduled workflow runs exactly every ten minutes.
+
+See [IMPROVEMENTS.md](IMPROVEMENTS.md) for prioritized maintenance suggestions and their tradeoffs.
 
 ## Troubleshooting
 
