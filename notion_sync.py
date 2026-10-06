@@ -36,6 +36,7 @@ from pathlib import Path
 import requests
 
 from job_utils import canonical_url, job_identity, load_json, save_json
+from project_config import DEFAULT_FOLLOW_UP_DAYS, follow_up_days
 
 _PAGE_CACHE = {}
 SYNC_ERRORS = []
@@ -75,6 +76,7 @@ def _notion_headers():
 
 
 def _notion(method, path, payload=None):
+    """Retry recoverable requests; reconcile ambiguous creates before retrying."""
     creating = method == "POST" and path in ("/pages", "/databases")
     for attempt in range(3):
         try:
@@ -82,24 +84,27 @@ def _notion(method, path, payload=None):
                                  headers=_notion_headers(), json=payload,
                                  timeout=30)
         except requests.exceptions.RequestException as e:
-            # Transient network blip (read timeout, connection reset). A single
-            # slow Notion response must not crash the whole watcher run — back
-            # off and retry, then give up like any other failed call.
-            SYNC_ERRORS.append("Notion " + type(e).__name__)
+            error = "Notion " + type(e).__name__
             print(f"  [warn] notion {path} -> {type(e).__name__}; "
-                  f"retry {attempt + 1}/3")
+                  f"attempt {attempt + 1}/3")
             if creating:
+                SYNC_ERRORS.append(error)
                 return None  # reconcile with a query before another create
-            time.sleep(2 * (attempt + 1))
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
             continue
         if r.status_code == 429:
-            time.sleep(float(r.headers.get("Retry-After", 2)))
+            error = "Notion HTTP 429"
+            if attempt < 2:
+                time.sleep(float(r.headers.get("Retry-After", 2)))
             continue
         if r.status_code >= 500:
-            SYNC_ERRORS.append(f"Notion HTTP {r.status_code}")
+            error = f"Notion HTTP {r.status_code}"
             if creating:
+                SYNC_ERRORS.append(error)
                 return None
-            time.sleep(2 ** attempt)
+            if attempt < 2:
+                time.sleep(2 ** attempt)
             continue
         if r.status_code >= 400:
             SYNC_ERRORS.append(f"Notion HTTP {r.status_code}")
@@ -107,7 +112,7 @@ def _notion(method, path, payload=None):
                   f"{r.text[:200]}")
             return None
         return r.json()
-    SYNC_ERRORS.append("Notion retries exhausted")
+    SYNC_ERRORS.append(error + "; retries exhausted")
     return None
 
 
@@ -255,11 +260,6 @@ def _pinned_message_ids(bot_token, msg_map):
                 break
             cursor = str(max(int(m["id"]) for m in batch))
     return pinned
-
-
-def _extract_url(text):
-    m = URL_RE.search(text or "")
-    return m.group(0).rstrip(").,]") if m else None
 
 
 _META_TAG_RE = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
@@ -446,11 +446,10 @@ def _parse_job_from_url(url):
 
     Role/location come from the ATS API when the link is Greenhouse/Lever/Ashby;
     otherwise from og:title. Company is resolved from the cleanest signal in
-    turn: a Greenhouse board's og:title, og:site_name, the employer named in the
-    title, the URL slug, then the domain. Always returns something so an applied
+    turn: ATS company data, og:site_name, the employer named in the title,
+    the URL slug, then the domain. Always returns something so an applied
     link is never dropped, even if the page can't be fetched.
     """
-    host = urllib.parse.urlparse(url).hostname or ""
     og_title = og_site = title_tag = None
     try:
         r = requests.get(
@@ -537,7 +536,7 @@ def _ensure_tracker(u, parent, days):
     return True
 
 
-def _upsert_row(db, job, status=None, follow_up_days=14):
+def _upsert_row(db, job, status=None, follow_up_days=DEFAULT_FOLLOW_UP_DAYS):
     """Find legacy rows by canonical identity; never downgrade pipeline status."""
     pages = _pages(db)
     if pages is None:
@@ -581,17 +580,21 @@ def log_master(job):
     return bool(_upsert_row(state["master_db"], job))
 
 
-def _sync_applied(state, bot_token, parent, cfg=None):
-    cfg = cfg or {}
-    channel_id = os.environ.get("APPLIED_CHANNEL_ID")
-    if not (bot_token and channel_id):
-        return False
-    if not state.get("applied_after"):
-        state["applied_after"] = _snowflake_now()
-        _save(state)
-        return True
+def _display_name(user):
+    return user.get("global_name") or user.get("username") or user["id"]
+
+
+def _tracker_user(state, user_id, name):
+    return state["users"].setdefault(user_id, {"name": name, "jobs": []})
+
+
+def _remember_page(user, job, page):
+    user.setdefault("pages", {})[job_identity(job)] = page["id"]
+
+
+def _collect_applied(state, bot_token, channel_id):
+    """Queue every link before checkpointing the channel's next message cursor."""
     pending = state.setdefault("pending_applied", {})
-    # Checkpoint each fetched batch before advancing its cursor.
     for _ in range(10):
         msgs = _channel_messages(bot_token, channel_id, state["applied_after"])
         if not msgs:
@@ -606,14 +609,19 @@ def _sync_applied(state, bot_token, parent, cfg=None):
                 for index, url in enumerate(urls):
                     pending.setdefault(f"{m['id']}:{index}", {
                         "mid": m["id"], "uid": author["id"], "url": canonical_url(url),
-                        "name": author.get("global_name") or author.get("username") or author["id"]})
+                        "name": _display_name(author)})
         state["applied_after"] = str(max(int(m["id"]) for m in msgs))
         _save(state)
         if len(msgs) < 100:
             break
+
+
+def _deliver_applied(state, bot_token, channel_id, parent, cfg):
+    """Retry queued links, acknowledging a message only after all its links succeed."""
+    pending = state["pending_applied"]
     for key, rec in list(pending.items()):
-        u = state["users"].setdefault(rec["uid"], {"name": rec["name"], "jobs": []})
-        days = cfg.get("profiles", {}).get(rec["uid"], {}).get("follow_up_days", cfg.get("follow_up_days", 14))
+        u = _tracker_user(state, rec["uid"], rec["name"])
+        days = follow_up_days(cfg, rec["uid"])
         if not _ensure_tracker(u, parent, days):
             _save(state)
             continue
@@ -625,7 +633,7 @@ def _sync_applied(state, bot_token, parent, cfg=None):
             _save(state)
         page = _upsert_row(u["db"], rec["job"], "Applied", days)
         if page:
-            u.setdefault("pages", {})[job_identity(rec["job"])] = page["id"]
+            _remember_page(u, rec["job"], page)
             applied = u.setdefault("applied", [])
             if rec["url"] not in applied:
                 applied.append(rec["url"])
@@ -633,7 +641,47 @@ def _sync_applied(state, bot_token, parent, cfg=None):
             _save(state)
             if not any(r["mid"] == rec["mid"] for r in pending.values()):
                 _react(bot_token, channel_id, rec["mid"], CHECK_EMOJI)
+
+
+def _sync_applied(state, bot_token, parent, cfg=None):
+    channel_id = os.environ.get("APPLIED_CHANNEL_ID")
+    if not (bot_token and channel_id):
+        return False
+    if not state.get("applied_after"):
+        state["applied_after"] = _snowflake_now()
+        _save(state)
+        return True
+    _collect_applied(state, bot_token, channel_id)
+    _deliver_applied(state, bot_token, channel_id, parent, cfg or {})
     return True
+
+
+def _sync_pins(state, bot_token, parent, cfg):
+    """Checkpoint observed reactions, then retry every queued save independently."""
+    msg_map = load_json(MSG_MAP_PATH, {})
+    pending = state.setdefault("pending_pins", {})
+    if bot_token and msg_map:
+        for mid in _pinned_message_ids(bot_token, msg_map):
+            rec = msg_map[mid]
+            for user in _pin_reactors(bot_token, rec["cid"], mid):
+                uid = user["id"]
+                u = _tracker_user(state, uid, _display_name(user))
+                if rec["job"]["id"] not in u["jobs"]:
+                    pending.setdefault(uid + ":" + rec["job"]["id"], {
+                        "uid": uid, "job": rec["job"],
+                    })
+        _save(state)
+    for key, rec in list(pending.items()):
+        u = state["users"][rec["uid"]]
+        days = follow_up_days(cfg, rec["uid"])
+        if _ensure_tracker(u, parent, days):
+            _save(state)
+            page = _upsert_row(u["db"], rec["job"], "Saved")
+            if page:
+                _remember_page(u, rec["job"], page)
+                u["jobs"].append(rec["job"]["id"])
+                del pending[key]
+                _save(state)
 
 
 # ---------------------------------------------------- dead-posting sweep
@@ -643,7 +691,7 @@ def _config_boards():
     custom-domain Greenhouse links ("careers.datadoghq.com/...?gh_jid=N")
     can still be liveness-checked via the board API."""
     try:
-        cfg = json.loads((ROOT / "config.json").read_text())
+        cfg = load_json(ROOT / "config.json", {})
     except (OSError, json.JSONDecodeError):
         return {}
     return {c["name"].lower(): (c["ats"], c["board"])
@@ -827,8 +875,11 @@ def _update_stats(state):
 # ------------------------------------------------------------------- main
 
 def run(new_jobs, cfg=None):
+    """Sync master delivery, pin saves, applied links, liveness, and tracker stats."""
     SYNC_ERRORS.clear()
-    cfg = cfg or load_json(ROOT / "config.json", {})
+    _PAGE_CACHE.clear()
+    if cfg is None:
+        cfg = load_json(ROOT / "config.json", {})
     for job in new_jobs:
         if not log_master(job):
             raise RuntimeError("Master log delivery failed")
@@ -836,29 +887,7 @@ def run(new_jobs, cfg=None):
     parent = os.environ["NOTION_PARENT_PAGE_ID"]
     bot_token = os.environ.get("DISCORD_BOT_TOKEN")
     try:
-        msg_map = load_json(MSG_MAP_PATH, {})
-        pending = state.setdefault("pending_pins", {})
-        if bot_token and msg_map:
-            for mid in _pinned_message_ids(bot_token, msg_map):
-                rec = msg_map[mid]
-                for user in _pin_reactors(bot_token, rec["cid"], mid):
-                    uid = user["id"]
-                    u = state["users"].setdefault(uid, {
-                        "name": user.get("global_name") or user.get("username") or uid, "jobs": []})
-                    if rec["job"]["id"] not in u["jobs"]:
-                        pending.setdefault(uid + ":" + rec["job"]["id"], {"uid": uid, "job": rec["job"]})
-            _save(state)
-        for key, rec in list(pending.items()):
-            u = state["users"][rec["uid"]]
-            days = cfg.get("profiles", {}).get(rec["uid"], {}).get("follow_up_days", cfg.get("follow_up_days", 14))
-            if _ensure_tracker(u, parent, days):
-                _save(state)
-                page = _upsert_row(u["db"], rec["job"], "Saved")
-                if page:
-                    u.setdefault("pages", {})[job_identity(rec["job"])] = page["id"]
-                    u["jobs"].append(rec["job"]["id"])
-                    del pending[key]
-                    _save(state)
+        _sync_pins(state, bot_token, parent, cfg)
         _sync_applied(state, bot_token, parent, cfg)
         _sweep_dead_postings(state)
         _PAGE_CACHE.clear()  # fresh statuses after the closing sweep

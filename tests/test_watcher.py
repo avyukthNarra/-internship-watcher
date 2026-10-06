@@ -181,6 +181,24 @@ class DeliveryTests(unittest.TestCase):
         self.assertFalse(watcher.SOURCE_HEALTH[url]['ok'])
         self.assertEqual(watcher.SOURCE_HEALTH[url]['last_success'], 42)
 
+    def test_malformed_schema_preserves_outage_age_across_http_success(self):
+        url = 'https://example.invalid/jobs'
+        watcher.SOURCE_HEALTH[url] = {'last_success': 42, 'ok': False, 'failing_since': 50}
+        response = Mock(status_code=200)
+        response.json.return_value = {'unexpected': []}
+        with patch.object(watcher.requests, 'get', return_value=response):
+            self.assertEqual(watcher.source_items(url, 'jobs'), [])
+        self.assertEqual(watcher.SOURCE_HEALTH[url]['last_success'], 42)
+        self.assertEqual(watcher.SOURCE_HEALTH[url]['failing_since'], 50)
+
+    def test_removed_source_does_not_keep_failing_later_runs(self):
+        (self.root/'health.json').write_text(json.dumps({'sources': {
+            'old-board': {'ok': False, 'error': 'HTTP 404', 'failing_since': 1}}}))
+        with patch.dict(os.environ, {'DISCORD_WEBHOOK_URL': 'test'}, clear=True), \
+             patch.object(watcher, 'discover', return_value=[]):
+            self.assertEqual(watcher.main([]), 0)
+        self.assertEqual(load_json(self.root/'health.json', {})['sources'], {})
+
     def test_invalid_config_rejected(self):
         with self.assertRaises(ValueError):
             watcher.validate_config({'companies': [], 'max_discord_per_run': -1})
