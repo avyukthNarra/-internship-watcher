@@ -42,7 +42,8 @@ def validate_config(cfg):
             raise ValueError("Unsupported ATS: " + company["ats"])
     _non_negative_integers(cfg, ("max_discord_per_run", "dedup_days", "follow_up_days",
                                "max_delivery_attempts"))
-    _string_lists(cfg, ("terms", "include_keywords", "exclude_keywords", "exclude_locations"))
+    _string_lists(cfg, ("terms", "include_keywords", "exclude_keywords", "exclude_locations",
+                          "allowed_user_ids"))
     _booleans(cfg, ("keep_unknown_terms",))
 
     for name, list_keys in (("simplify", ("terms", "company_keywords")),

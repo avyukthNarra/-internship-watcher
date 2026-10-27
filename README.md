@@ -83,6 +83,8 @@ With no delivery credentials, or with `python watcher.py --dry-run`, the watcher
 
 Wayve is fetched directly from its Ashby board. Postman moved to Workday, which the watcher does not fetch directly; it is included in the SimplifyJobs company filter and remains eligible for Jobright routing. Postman alerts depend on those feeds publishing matching jobs within the configured age window.
 
+`allowed_user_ids` (optional list of Discord user IDs) restricts who the bot serves. When it is set, 📌 reactions and applied-channel links from anyone else are ignored; when it is absent or empty, everyone is served. Applied-channel intake is also bounded: at most 5 links per message (extras get a ⚠️ reaction) and 20 links read per run, with the rest picked up on later runs.
+
 For profiles, use Discord user IDs as keys, for example:
 
 ```json

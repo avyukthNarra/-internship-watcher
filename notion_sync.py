@@ -66,6 +66,14 @@ STATUS_OPTIONS = [
 ]
 
 DEAD_SWEEP_INTERVAL = 24 * 3600  # re-check Saved rows once a day
+MAX_LINKS_PER_MESSAGE = 5
+MAX_APPLIED_LINKS_PER_RUN = 20  # bounds outbound fetches a link spammer can trigger
+
+
+def _allowed(cfg, user_id):
+    """allowed_user_ids restricts who may use the bot; unset or empty allows everyone."""
+    allowed = (cfg or {}).get("allowed_user_ids")
+    return not allowed or user_id in allowed
 
 
 def _notion_headers():
@@ -597,27 +605,38 @@ def _remember_page(user, job, page):
     user.setdefault("pages", {})[job_identity(job)] = page["id"]
 
 
-def _collect_applied(state, bot_token, channel_id):
-    """Queue every link before checkpointing the channel's next message cursor."""
+def _collect_applied(state, bot_token, channel_id, cfg=None):
+    """Queue every link before checkpointing the channel's next message cursor.
+    A message with more than MAX_LINKS_PER_MESSAGE links is truncated with a
+    warning reaction. Once MAX_APPLIED_LINKS_PER_RUN links are queued, reading
+    stops and the cursor stays put, so the rest is handled next run."""
     pending = state.setdefault("pending_applied", {})
+    queued = 0
     for _ in range(10):
         msgs = _channel_messages(bot_token, channel_id, state["applied_after"])
         if not msgs:
             break
+        cursor = None
         for m in sorted(msgs, key=lambda m: int(m["id"])):
+            if queued >= MAX_APPLIED_LINKS_PER_RUN:
+                break
+            cursor = m["id"]
             author = m.get("author", {})
-            if not author.get("bot"):
-                urls = list(dict.fromkeys(match.group(0).rstrip(").,]")
-                                          for match in URL_RE.finditer(m.get("content", ""))))
-                if not urls:
-                    _react(bot_token, channel_id, m["id"], WARN_EMOJI)
-                for index, url in enumerate(urls):
-                    pending.setdefault(f"{m['id']}:{index}", {
-                        "mid": m["id"], "uid": author["id"], "url": canonical_url(url),
-                        "name": _display_name(author)})
-        state["applied_after"] = str(max(int(m["id"]) for m in msgs))
+            if author.get("bot") or not _allowed(cfg, author.get("id")):
+                continue
+            urls = list(dict.fromkeys(match.group(0).rstrip(").,]")
+                                      for match in URL_RE.finditer(m.get("content", ""))))
+            if not urls or len(urls) > MAX_LINKS_PER_MESSAGE:
+                _react(bot_token, channel_id, m["id"], WARN_EMOJI)
+            for index, url in enumerate(urls[:MAX_LINKS_PER_MESSAGE]):
+                pending.setdefault(f"{m['id']}:{index}", {
+                    "mid": m["id"], "uid": author["id"], "url": canonical_url(url),
+                    "name": _display_name(author)})
+            queued += min(len(urls), MAX_LINKS_PER_MESSAGE)
+        if cursor:
+            state["applied_after"] = cursor
         _save(state)
-        if len(msgs) < 100:
+        if len(msgs) < 100 or queued >= MAX_APPLIED_LINKS_PER_RUN:
             break
 
 
@@ -656,7 +675,7 @@ def _sync_applied(state, bot_token, parent, cfg=None):
         state["applied_after"] = _snowflake_now()
         _save(state)
         return True
-    _collect_applied(state, bot_token, channel_id)
+    _collect_applied(state, bot_token, channel_id, cfg)
     _deliver_applied(state, bot_token, channel_id, parent, cfg or {})
     return True
 
@@ -670,6 +689,8 @@ def _sync_pins(state, bot_token, parent, cfg):
             rec = msg_map[mid]
             for user in _pin_reactors(bot_token, rec["cid"], mid):
                 uid = user["id"]
+                if not _allowed(cfg, uid):
+                    continue
                 u = _tracker_user(state, uid, _display_name(user))
                 if rec["job"]["id"] not in u["jobs"]:
                     pending.setdefault(uid + ":" + rec["job"]["id"], {

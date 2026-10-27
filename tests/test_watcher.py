@@ -419,6 +419,7 @@ class NotionTests(unittest.TestCase):
         second = [{'id': '102', 'author': {'id': 'u'}, 'content': 'https://example.com/jobs/102'}]
         with patch.dict(os.environ, {'APPLIED_CHANNEL_ID': 'c'}), \
              patch.object(notion, '_channel_messages', side_effect=[messages, second]) as fetch, \
+             patch.object(notion, 'MAX_APPLIED_LINKS_PER_RUN', 1000), \
              patch.object(notion, '_save'), patch.object(notion, '_ensure_tracker', return_value=False):
             notion._sync_applied(state, 'token', 'parent')
         self.assertEqual(fetch.call_args_list[1].args[2], '101')

@@ -85,6 +85,53 @@ class NotionSyncTests(unittest.TestCase):
         self.assertEqual(saved["users"]["u"]["jobs"], [j["id"]])
         self.assertEqual(saved["users"]["u"]["pages"][job_identity(j)], "page")
 
+    def test_allowlist_ignores_other_pin_reactors_and_empty_allowlist_allows_all(self):
+        j = job()
+        notion.MSG_MAP_PATH.write_text(json.dumps({"message": {"cid": "channel", "job": j}}))
+        reactors = [{"id": "stranger", "username": "x"}, {"id": "friend", "username": "y"}]
+
+        def ensure(user, parent, days):
+            user["db"] = "db"
+            return True
+
+        for allowed, expected in ((["friend"], {"friend"}), ([], {"stranger", "friend"})):
+            state = {"users": {}}
+            with patch.object(notion, "_pinned_message_ids", return_value={"message"}), \
+                 patch.object(notion, "_pin_reactors", return_value=reactors), \
+                 patch.object(notion, "_ensure_tracker", side_effect=ensure), \
+                 patch.object(notion, "_upsert_row", return_value={"id": "page"}):
+                notion._sync_pins(state, "token", "parent", {"allowed_user_ids": allowed})
+            self.assertEqual(set(state["users"]), expected)
+
+    def collect(self, messages, cfg=None):
+        state = {"users": {}, "applied_after": "0"}
+        with patch.object(notion, "_channel_messages", return_value=messages), \
+             patch.object(notion, "_react") as react:
+            notion._collect_applied(state, "token", "channel", cfg)
+        return state, react
+
+    def test_applied_channel_ignores_users_outside_the_allowlist(self):
+        messages = [{"id": "1", "author": {"id": "stranger"}, "content": "https://example.com/jobs/1"},
+                    {"id": "2", "author": {"id": "friend"}, "content": "https://example.com/jobs/2"}]
+        state, react = self.collect(messages, {"allowed_user_ids": ["friend"]})
+        self.assertEqual(list(state["pending_applied"]), ["2:0"])
+        react.assert_not_called()
+        self.assertEqual(state["applied_after"], "2")
+
+    def test_applied_links_are_capped_per_message_and_per_run(self):
+        many = " ".join(f"https://example.com/jobs/{i}" for i in range(8))
+        state, react = self.collect([{"id": "1", "author": {"id": "u"}, "content": many}])
+        self.assertEqual(len(state["pending_applied"]), notion.MAX_LINKS_PER_MESSAGE)
+        react.assert_called_once_with("token", "channel", "1", notion.WARN_EMOJI)
+
+        flood = [{"id": str(i), "author": {"id": "u"}, "content": f"https://example.com/jobs/{i}"}
+                 for i in range(1, 31)]
+        state, react = self.collect(flood)
+        self.assertEqual(len(state["pending_applied"]), notion.MAX_APPLIED_LINKS_PER_RUN)
+        react.assert_not_called()
+        # The cursor stops after the last queued message, so the rest is read next run.
+        self.assertEqual(state["applied_after"], str(notion.MAX_APPLIED_LINKS_PER_RUN))
+
     def test_applied_message_is_acknowledged_only_after_every_link_succeeds(self):
         state = {"users": {}, "applied_after": "1"}
         message = {"id": "2", "author": {"id": "u"},

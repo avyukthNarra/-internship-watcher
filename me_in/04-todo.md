@@ -34,7 +34,7 @@ Ground rules for every change: keep the tests green (`python3 -m unittest discov
 ## Phase 3 — Input hardening
 
 - [x] **S3:** `net_safety.safe_get_text()` guards `_parse_job_from_url` (scheme allowlist, private-IP block, per-hop redirect check, 1 MB cap). Done. `_posting_open` only calls fixed ATS API hosts, so it was left alone. DNS rebinding is narrowed, not eliminated.
-- [ ] **S5:** `allowed_user_ids` in config, per-message and per-run URL caps, and a cap on tracker creations per run.
+- [x] **S5:** optional `allowed_user_ids`, 5 links per message, 20 links read per run (excess deferred, not dropped). Done. No cap on tracker creations was added; the allowlist covers it.
 - [x] **S7:** `host_is()` and `quote()` applied in `notion_sync.py`. Done.
 
 ## Phase 4 — Privacy and state (do this before the website)
