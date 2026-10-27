@@ -1,6 +1,7 @@
 """Build and format scan health without performing network or state writes."""
 
 SOURCE_ALERT_AFTER = 5 * 3600
+BROAD_OUTAGE_FRACTION = 0.10  # stale share of sources that counts as an outage
 
 
 def build_health(sources, previous_sources, *, now, matching_jobs, new_jobs,
@@ -44,6 +45,8 @@ def health_summary(health):
 
 
 def health_exit_code(health):
-    """Short source outages are tolerated; stale sources and delivery failures are not."""
-    return int(bool(health["stale_failed_sources"]
-                    or health["sync_error"] or health["pending_deliveries"]))
+    """A few stale sources are warnings (shown in the summary); a broad outage,
+    stuck deliveries, or a sync error fail the run."""
+    total = health["successful_sources"] + health["failed_sources"]
+    broad_outage = bool(total) and health["stale_failed_sources"] / total >= BROAD_OUTAGE_FRACTION
+    return int(broad_outage or bool(health["sync_error"] or health["pending_deliveries"]))
