@@ -69,6 +69,22 @@ def validate_config(cfg):
         if "webhook_env" in profile and (not isinstance(profile["webhook_env"], str)
                                          or not profile["webhook_env"].startswith("DISCORD_WEBHOOK_")):
             raise ValueError("Profile webhook_env must begin DISCORD_WEBHOOK_")
+    _validate_alert_channels(cfg.get("alert_channels", []))
+
+
+def _validate_alert_channels(channels):
+    if not isinstance(channels, list):
+        raise ValueError("alert_channels must be a list")
+    for channel in channels:
+        if not isinstance(channel, dict):
+            raise ValueError("Each alert channel must be an object")
+        if not isinstance(channel.get("name"), str) or not channel["name"]:
+            raise ValueError("Each alert channel needs a name")
+        if not isinstance(channel.get("webhook_env"), str) \
+                or not channel["webhook_env"].startswith("DISCORD_WEBHOOK_"):
+            raise ValueError("Alert channel webhook_env must begin DISCORD_WEBHOOK_")
+        _string_lists(channel, ("roles", "companies", "locations", "terms"), "Alert channel ")
+        _booleans(channel, ("keep_unknown_terms",), "Alert channel ")
 
 
 def load_personal_webhooks(environ=None):
@@ -91,7 +107,7 @@ def notifications_enabled(cfg, environ=None):
         or (environ.get("SMTP_USER") and environ.get("SMTP_PASS"))
         or (environ.get("NOTION_TOKEN") and environ.get("NOTION_PARENT_PAGE_ID"))
         or any(environ.get(profile.get("webhook_env", ""))
-               for profile in cfg.get("profiles", {}).values())
+               for profile in [*cfg.get("profiles", {}).values(), *cfg.get("alert_channels", [])])
     )
 
 

@@ -83,6 +83,23 @@ With no delivery credentials, or with `python watcher.py --dry-run`, the watcher
 
 Wayve is fetched directly from its Ashby board. Postman moved to Workday, which the watcher does not fetch directly; it is included in the SimplifyJobs company filter and remains eligible for Jobright routing. Postman alerts depend on those feeds publishing matching jobs within the configured age window.
 
+### Alert channels
+
+`alert_channels` (optional list) posts matching jobs into extra Discord channels, in addition to the normal channel. Each entry has a `name`, a `webhook_env`, and any of `roles`, `companies`, `locations`, `terms`, `keep_unknown_terms`; empty or missing lists impose no restriction. People opt in by turning on notifications for the channels they care about, so no per-person setup is needed.
+
+```json
+{
+  "alert_channels": [
+    {"name": "quant", "webhook_env": "DISCORD_WEBHOOK_QUANT",
+     "companies": ["Jane Street", "Citadel", "Two Sigma"]},
+    {"name": "ml-nyc", "webhook_env": "DISCORD_WEBHOOK_MLNYC",
+     "roles": ["machine learning", "ml"], "locations": ["New York"], "terms": ["Summer 2027"]}
+  ]
+}
+```
+
+Add each channel's webhook URL to the `PERSONAL_WEBHOOKS_JSON` secret under the same name (for example `{"DISCORD_WEBHOOK_QUANT": "https://discord.com/api/webhooks/REDACTED"}`); no workflow change is needed. A channel whose webhook is not set is skipped.
+
 `allowed_user_ids` (optional list of Discord user IDs) restricts who the bot serves. When it is set, 📌 reactions and applied-channel links from anyone else are ignored; when it is absent or empty, everyone is served. Applied-channel intake is also bounded: at most 5 links per message (extras get a ⚠️ reaction) and 20 links read per run, with the rest picked up on later runs.
 
 For profiles, use Discord user IDs as keys, for example:

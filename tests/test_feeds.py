@@ -113,6 +113,51 @@ class FilteringAndRoutingTests(unittest.TestCase):
             self.assertEqual(watcher.destinations(farmers, cfg), ["discord:DISCORD_WEBHOOK_URL"])
 
 
+class AlertChannelTests(unittest.TestCase):
+    CFG = {"companies": [], "alert_channels": [
+        {"name": "quant", "webhook_env": "DISCORD_WEBHOOK_QUANT", "companies": ["Jane Street", "Citadel"]},
+        {"name": "ml-nyc", "webhook_env": "DISCORD_WEBHOOK_MLNYC", "roles": ["machine learning", "ml"],
+         "locations": ["New York"], "terms": ["Summer 2027"]}]}
+
+    def job(self, **kw):
+        return {"id": "jobright:1", "company": "Acme", "title": "SWE Intern",
+                "location": "Austin, TX", "url": "u", **kw}
+
+    def route(self, job, env=None):
+        env = {"DISCORD_WEBHOOK_URL": "d", "DISCORD_WEBHOOK_QUANT": "q", "DISCORD_WEBHOOK_MLNYC": "m",
+               **(env or {})}
+        with patch.dict(os.environ, env, clear=True):
+            return watcher.destinations(job, self.CFG)
+
+    def test_each_channel_gets_only_matching_jobs_in_addition_to_the_default(self):
+        self.assertEqual(self.route(self.job()), ["discord:DISCORD_WEBHOOK_URL"])
+        self.assertEqual(self.route(self.job(company="Jane Street")),
+                         ["discord:DISCORD_WEBHOOK_URL", "discord:DISCORD_WEBHOOK_QUANT"])
+        ml = self.job(title="Machine Learning Intern", location="New York, NY",
+                      terms=["Summer 2027"])
+        self.assertEqual(self.route(ml), ["discord:DISCORD_WEBHOOK_URL", "discord:DISCORD_WEBHOOK_MLNYC"])
+        self.assertEqual(self.route({**ml, "location": "Austin, TX"}), ["discord:DISCORD_WEBHOOK_URL"])
+        both = {**ml, "company": "Citadel"}
+        self.assertEqual(len(self.route(both)), 3)
+
+    def test_channel_without_a_configured_webhook_is_skipped(self):
+        env = {"DISCORD_WEBHOOK_URL": "d"}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(watcher.destinations(self.job(company="Citadel"), self.CFG),
+                             ["discord:DISCORD_WEBHOOK_URL"])
+
+    def test_config_validation_and_alert_channel_webhook_enables_notifications(self):
+        from project_config import notifications_enabled, validate_config
+        validate_config(self.CFG)
+        for bad in ("quant", [{"webhook_env": "DISCORD_WEBHOOK_X"}],
+                    [{"name": "x", "webhook_env": "SECRET"}],
+                    [{"name": "x", "webhook_env": "DISCORD_WEBHOOK_X", "roles": "ml"}]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                validate_config({"companies": [], "alert_channels": bad})
+        self.assertFalse(notifications_enabled(self.CFG, {}))
+        self.assertTrue(notifications_enabled(self.CFG, {"DISCORD_WEBHOOK_QUANT": "q"}))
+
+
 class SimplifyCacheTests(unittest.TestCase):
     URL = "https://feed.example/listings.json"
     CFG = {"simplify": {"enabled": True, "url": URL, "max_age_days": 7}, "terms": ["Summer 2027"]}

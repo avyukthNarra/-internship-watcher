@@ -449,7 +449,8 @@ def destinations(job, cfg):
         result.append("email")
     if os.environ.get("NOTION_TOKEN") and os.environ.get("NOTION_PARENT_PAGE_ID"):
         result.append("notion")
-    for preferences in cfg.get("profiles", {}).values():
+    # Personal profiles and shared alert channels route the same way.
+    for preferences in [*cfg.get("profiles", {}).values(), *cfg.get("alert_channels", [])]:
         hook = preferences.get("webhook_env")
         if hook and os.environ.get(hook) and preference_matches(job, preferences):
             result.append("discord:" + hook)
