@@ -186,6 +186,49 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(found[0]['location'], '')
         fingerprint(found[0])  # previously AttributeError on a null location
 
+    def queue(self, *jobs):
+        return {'pending': {j['id']: {'job': j, 'destinations': ['email'], 'created': 0} for j in jobs}}
+
+    def test_unexpected_error_does_not_block_later_jobs(self):
+        bad, good = job('a:1'), job('a:2')
+        ledger = self.queue(bad, good)
+        sent = []
+        def send(cfg, jobs):
+            if jobs[0]['id'] == 'a:1':
+                raise TypeError('boom')
+            sent.append(jobs[0]['id'])
+        with patch.object(watcher, 'notify_email', side_effect=send):
+            watcher.deliver(ledger, {}, {}, lambda: None)
+        self.assertEqual(sent, ['a:2'])
+        self.assertEqual(list(ledger['pending']), ['a:1'])
+        self.assertEqual(ledger['pending']['a:1']['error'], 'TypeError')
+
+    def test_repeated_failure_is_parked_and_stops_failing_runs(self):
+        from source_health import build_health, health_exit_code, health_summary
+        ledger = self.queue(job('a:1'))
+        cfg = {'max_delivery_attempts': 3}
+        with patch.object(watcher, 'notify_email', side_effect=ValueError('bad')):
+            for _ in range(2):
+                watcher.deliver(ledger, cfg, {}, lambda: None)
+            self.assertIn('a:1', ledger['pending'])
+            watcher.deliver(ledger, cfg, {}, lambda: None)
+        self.assertEqual(ledger['pending'], {})
+        parked = ledger['dead']['a:1|email']
+        self.assertEqual((parked['attempts'], parked['error']), (3, 'ValueError'))
+        health = build_health({}, {}, now=1, matching_jobs=0, new_jobs=0, pending_deliveries=0,
+                              sync_error=None, dead_deliveries=len(ledger['dead']))
+        self.assertEqual(health_exit_code(health), 0)
+        self.assertIn('parked: 1', health_summary(health))
+
+    def test_success_clears_attempt_count(self):
+        ledger = self.queue(job('a:1'))
+        with patch.object(watcher, 'notify_email', side_effect=[ValueError('x'), None]):
+            watcher.deliver(ledger, {}, {}, lambda: None)
+            self.assertEqual(ledger['pending']['a:1']['tries'], {'email': 1})
+            watcher.deliver(ledger, {}, {}, lambda: None)
+        self.assertEqual(ledger['pending'], {})
+        self.assertEqual(ledger.get('dead', {}), {})
+
     def test_dry_run_unchanged_even_with_credentials(self):
         before = {p.name: p.read_bytes() for p in self.root.iterdir()}
         with patch.dict(os.environ, {'DISCORD_WEBHOOK_URL': 'test'}, clear=True), \

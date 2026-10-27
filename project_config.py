@@ -7,6 +7,7 @@ from job_feeds import BOARD_APIS
 
 DEFAULT_DISCORD_LIMIT = 50
 DEFAULT_DEDUP_DAYS = 30
+DEFAULT_MAX_DELIVERY_ATTEMPTS = 20  # about 3 hours of 10-minute runs; 0 disables
 DEFAULT_FOLLOW_UP_DAYS = 14
 
 
@@ -39,7 +40,8 @@ def validate_config(cfg):
             raise ValueError("Every company needs name, ats, and board strings")
         if company["ats"] not in BOARD_APIS:
             raise ValueError("Unsupported ATS: " + company["ats"])
-    _non_negative_integers(cfg, ("max_discord_per_run", "dedup_days", "follow_up_days"))
+    _non_negative_integers(cfg, ("max_discord_per_run", "dedup_days", "follow_up_days",
+                               "max_delivery_attempts"))
     _string_lists(cfg, ("terms", "include_keywords", "exclude_keywords", "exclude_locations"))
     _booleans(cfg, ("keep_unknown_terms",))
 

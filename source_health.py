@@ -4,7 +4,7 @@ SOURCE_ALERT_AFTER = 5 * 3600
 
 
 def build_health(sources, previous_sources, *, now, matching_jobs, new_jobs,
-                 pending_deliveries, sync_error):
+                 pending_deliveries, sync_error, dead_deliveries=0):
     sources = {url: dict(record) for url, record in sources.items()}
     for url, source in sources.items():
         if source.get("ok"):
@@ -24,6 +24,7 @@ def build_health(sources, previous_sources, *, now, matching_jobs, new_jobs,
         "matching_jobs": matching_jobs,
         "new_jobs": new_jobs,
         "pending_deliveries": pending_deliveries,
+        "dead_deliveries": dead_deliveries,
         "sync_error": sync_error,
     }
 
@@ -32,7 +33,8 @@ def health_summary(health):
     lines = [
         f"Sources: {health['successful_sources']} OK, {health['failed_sources']} failed "
         f"({health['stale_failed_sources']} down {SOURCE_ALERT_AFTER // 3600}h+); "
-        f"pending deliveries: {health['pending_deliveries']}; sync: {health['sync_error'] or 'OK'}"
+        f"pending deliveries: {health['pending_deliveries']}"
+        f"{', parked: ' + str(health['dead_deliveries']) if health.get('dead_deliveries') else ''}; sync: {health['sync_error'] or 'OK'}"
     ]
     for url, source in sorted(health["sources"].items()):
         if not source.get("ok"):

@@ -28,7 +28,7 @@ import requests
 from job_utils import (load_json, save_json, canonical_url, job_identity, clean_job,
                        fingerprint, term_matches, preference_matches)
 from job_feeds import board_url, feed_items
-from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT,
+from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT, DEFAULT_MAX_DELIVERY_ATTEMPTS,
                             load_personal_webhooks, notifications_enabled, validate_config)
 from source_health import SOURCE_ALERT_AFTER, build_health, health_summary, health_exit_code
 
@@ -419,10 +419,13 @@ def destinations(job, cfg):
 def deliver(ledger, cfg, msg_map, checkpoint):
     # Bound work while retaining every undelivered job for the next run.
     budget = cfg.get("max_discord_per_run", DEFAULT_DISCORD_LIMIT)
+    max_attempts = cfg.get("max_delivery_attempts", DEFAULT_MAX_DELIVERY_ATTEMPTS)
+    dead = ledger.setdefault("dead", {})
     for entry in list(ledger.setdefault("pending", {}).values()):
         for destination in list(entry["destinations"]):
             job = entry["job"]
             success = False
+            error = "DeliveryFailed"
             try:
                 if destination.startswith("discord:"):
                     hook = os.environ.get(destination.split(":", 1)[1])
@@ -440,13 +443,25 @@ def deliver(ledger, cfg, msg_map, checkpoint):
                 elif destination == "notion":
                     import notion_sync
                     success = notion_sync.log_master(job)
-            except (requests.RequestException, smtplib.SMTPException, OSError, ValueError, KeyError) as exc:
-                entry["error"] = type(exc).__name__
+            except Exception as exc:
+                # One malformed posting must never stop the jobs queued behind it.
+                error = type(exc).__name__
             if success:
                 entry["destinations"].remove(destination)
                 entry.pop("error", None)
-            else:
-                entry["attempts"] = entry.get("attempts", 0) + 1
+                entry.get("tries", {}).pop(destination, None)
+                continue
+            tries = entry.setdefault("tries", {})
+            tries[destination] = tries.get(destination, 0) + 1
+            entry["attempts"] = entry.get("attempts", 0) + 1
+            entry["error"] = error
+            if max_attempts and tries[destination] >= max_attempts:
+                # Park it: reported in health.json but no longer retried or failing runs.
+                dead[f"{job['id']}|{destination}"] = {
+                    "job": job, "destination": destination, "error": error,
+                    "attempts": tries[destination], "dead_at": time.time()}
+                entry["destinations"].remove(destination)
+                tries.pop(destination, None)
             checkpoint()
     ledger["pending"] = {k: v for k, v in ledger["pending"].items() if v["destinations"]}
     checkpoint()
@@ -528,6 +543,7 @@ def main(argv=None):
         current_sources, previous_sources, now=now,
         matching_jobs=len(all_jobs), new_jobs=len(new_jobs),
         pending_deliveries=sum(len(entry["destinations"]) for entry in ledger["pending"].values()),
+        dead_deliveries=len(ledger.get("dead", {})),
         sync_error=sync_error,
     )
     return report_health(health)
