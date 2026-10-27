@@ -1,7 +1,8 @@
 import os
 import unittest
 from datetime import datetime, timezone
-from unittest.mock import patch
+import time
+from unittest.mock import Mock, patch
 
 import watcher
 
@@ -110,6 +111,70 @@ class FilteringAndRoutingTests(unittest.TestCase):
             self.assertEqual(watcher.destinations(acme, cfg),
                              ["discord:DISCORD_WEBHOOK_URL_TOP", "discord:DISCORD_WEBHOOK_PROFILE"])
             self.assertEqual(watcher.destinations(farmers, cfg), ["discord:DISCORD_WEBHOOK_URL"])
+
+
+class SimplifyCacheTests(unittest.TestCase):
+    URL = "https://feed.example/listings.json"
+    CFG = {"simplify": {"enabled": True, "url": URL, "max_age_days": 7}, "terms": ["Summer 2027"]}
+    LISTING = [{"id": "1", "active": True, "date_posted": time.time(), "company_name": "Acme",
+                "title": "SWE Intern", "locations": ["Austin, TX"], "url": "https://x.example/1",
+                "terms": ["Summer 2027"]}]
+
+    def setUp(self):
+        watcher.SOURCE_HEALTH.clear()
+        patcher = patch.object(watcher, "CONDITIONAL_FETCH", True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(watcher.SOURCE_HEALTH.clear)
+
+    def ok(self, etag="v1"):
+        return Mock(status_code=200, headers={"ETag": etag}, json=lambda: self.LISTING)
+
+    def fetch(self, *responses, cfg=None):
+        with patch.object(watcher.requests, "get", side_effect=list(responses)) as get:
+            jobs = watcher.fetch_simplify(cfg or self.CFG)
+        sent = get.call_args.kwargs["headers"].get("If-None-Match") if get.call_args else None
+        return jobs, sent
+
+    def test_first_fetch_is_full_and_stores_the_etag(self):
+        jobs, sent = self.fetch(self.ok())
+        self.assertEqual([j["id"] for j in jobs], ["simplify:1"])
+        self.assertIsNone(sent)
+        record = watcher.SOURCE_HEALTH[self.URL]
+        self.assertEqual(record["etag"], "v1")
+        self.assertTrue(record["ok"] and record["filter_digest"] and record["full_fetch"])
+
+    def test_unchanged_feed_returns_nothing_and_keeps_the_cache(self):
+        self.fetch(self.ok())
+        before = watcher.SOURCE_HEALTH[self.URL]
+        jobs, sent = self.fetch(Mock(status_code=304, headers={}))
+        self.assertEqual((jobs, sent), ([], "v1"))
+        after = watcher.SOURCE_HEALTH[self.URL]
+        self.assertIsNot(after, before)  # counts as polled this run
+        self.assertTrue(after["ok"])
+        self.assertEqual((after["etag"], after["full_fetch"]), (before["etag"], before["full_fetch"]))
+
+    def test_changed_feed_replaces_the_etag(self):
+        self.fetch(self.ok("v1"))
+        jobs, sent = self.fetch(self.ok("v2"))
+        self.assertEqual((len(jobs), sent), (1, "v1"))
+        self.assertEqual(watcher.SOURCE_HEALTH[self.URL]["etag"], "v2")
+
+    def test_filter_change_or_age_forces_a_full_fetch(self):
+        self.fetch(self.ok())
+        changed = {**self.CFG, "terms": ["Fall 2027"]}
+        self.assertIsNone(self.fetch(self.ok(), cfg=changed)[1])
+        watcher.SOURCE_HEALTH[self.URL]["full_fetch"] = time.time() - watcher.FULL_FETCH_INTERVAL - 1
+        self.assertIsNone(self.fetch(self.ok(), cfg=changed)[1])
+
+    def test_dry_run_and_failed_source_never_use_the_cache(self):
+        self.fetch(self.ok())
+        with patch.object(watcher, "CONDITIONAL_FETCH", False):
+            self.assertIsNone(self.fetch(self.ok())[1])
+        with patch.object(watcher.time, "sleep"):
+            self.fetch(*[Mock(status_code=500, headers={})] * 3)
+            self.assertFalse(watcher.SOURCE_HEALTH[self.URL]["ok"])
+            self.assertIsNone(self.fetch(self.ok())[1])
 
 
 if __name__ == "__main__":

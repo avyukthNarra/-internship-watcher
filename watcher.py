@@ -11,6 +11,8 @@ checkpoints delivery, deduplication, and tracker state for safe retries.
 """
 
 import argparse
+import hashlib
+import json
 import os
 import re
 import smtplib
@@ -65,16 +67,30 @@ def matches(title: str, include_kw, exclude_kw) -> bool:
 
 
 SOURCE_HEALTH = {}
+NOT_MODIFIED = object()  # a conditional fetch found the feed unchanged
+CONDITIONAL_FETCH = True  # main() turns this off for dry runs so previews show the full feed
+FULL_FETCH_INTERVAL = 3600  # always refetch in full at least hourly as a safety net
 
 
-def fetch(url, as_text=False):
+def fetch(url, as_text=False, etag=None, track_etag=False):
+    """GET with retries. With `etag`, sends If-None-Match and returns
+    NOT_MODIFIED on HTTP 304. With `track_etag`, the response ETag is kept
+    in the source record for the next run."""
     previous = SOURCE_HEALTH.get(url, {})
+    headers = {**HEADERS, **({"If-None-Match": etag} if etag else {})}
     for attempt in range(3):
         try:
-            r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            r = requests.get(url, headers=headers, timeout=TIMEOUT)
+            if r.status_code == 304 and etag:
+                SOURCE_HEALTH[url] = {**previous, "ok": True, "last_success": time.time()}
+                return NOT_MODIFIED
             if r.status_code == 200:
                 result = r.text if as_text else r.json()
-                SOURCE_HEALTH[url] = {"ok": True, "last_success": time.time()}
+                record = {"ok": True, "last_success": time.time()}
+                new_etag = r.headers.get("ETag") if track_etag else None
+                if isinstance(new_etag, str):
+                    record["etag"] = new_etag
+                SOURCE_HEALTH[url] = record
                 return result
             error = f"HTTP {r.status_code}"
             if r.status_code != 429 and r.status_code < 500:
@@ -88,7 +104,9 @@ def fetch(url, as_text=False):
     return None
 
 
-def get(url):
+def get(url, etag=None, track_etag=False):
+    if etag or track_etag:
+        return fetch(url, etag=etag, track_etag=track_etag)
     return fetch(url)
 
 
@@ -130,9 +148,11 @@ def location_excluded(location: str, patterns) -> bool:
 
 # ------------------------------------------------------------- ATS fetchers
 
-def source_items(url, key=None):
+def source_items(url, key=None, etag=None, track_etag=False):
     previous = dict(SOURCE_HEALTH.get(url, {}))
-    data = get(url)
+    data = get(url, etag=etag, track_etag=track_etag) if (etag or track_etag) else get(url)
+    if data is NOT_MODIFIED:
+        return NOT_MODIFIED
     if data is None:
         return []
     items = feed_items(data, key)
@@ -191,10 +211,30 @@ ATS_FETCHERS = {
 }
 
 
+def _filter_digest(cfg):
+    """Changes whenever a setting that affects which listings match changes,
+    which invalidates the cached ETag."""
+    keys = ("simplify", "include_keywords", "exclude_keywords", "exclude_locations",
+            "terms", "keep_unknown_terms")
+    blob = json.dumps({k: cfg.get(k) for k in keys}, sort_keys=True)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
 def fetch_simplify(cfg):
     """SimplifyJobs aggregated internship list (covers Workday/etc. companies)."""
-    data = source_items(cfg.get("simplify", {}).get("url", SIMPLIFY_URL))
     sim = cfg.get("simplify", {})
+    url = sim.get("url", SIMPLIFY_URL)
+    record = SOURCE_HEALTH.get(url, {})
+    digest = _filter_digest(cfg)
+    cached = (CONDITIONAL_FETCH and record.get("ok") and record.get("etag")
+              and record.get("filter_digest") == digest
+              and time.time() - record.get("full_fetch", 0) < FULL_FETCH_INTERVAL)
+    data = source_items(url, etag=record["etag"] if cached else None, track_etag=CONDITIONAL_FETCH)
+    if data is NOT_MODIFIED:
+        # Nothing changed since a run that already evaluated every listing.
+        return []
+    if SOURCE_HEALTH.get(url, {}).get("ok") and SOURCE_HEALTH[url].get("etag"):
+        SOURCE_HEALTH[url] = {**SOURCE_HEALTH[url], "filter_digest": digest, "full_fetch": time.time()}
     company_filter = [c.lower() for c in sim.get("company_keywords", [])]
     min_age_days = sim.get("max_age_days", 14)
     cutoff = time.time() - min_age_days * 86400
@@ -497,6 +537,8 @@ def main(argv=None):
     validate_config(cfg)
     load_personal_webhooks()
     dry_run = args.dry_run or not notifications_enabled(cfg)
+    global CONDITIONAL_FETCH
+    CONDITIONAL_FETCH = not dry_run
     ledger_path = ROOT / "delivery_state.json"
     health_path = ROOT / "health.json"
     ledger = load_json(ledger_path, {})

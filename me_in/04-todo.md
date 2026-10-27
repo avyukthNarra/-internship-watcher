@@ -25,7 +25,7 @@ Ground rules for every change: keep the tests green (`python3 -m unittest discov
 
 - [ ] **R5:** stop committing `health.json` every run (or only commit when state changed).
 - [ ] **R6:** one authority for seen IDs; split the pending queue from history; prune IDs not seen for about 180 days (behind a test).
-- [ ] **P1:** ETag/conditional GET for the 13 MB SimplifyJobs feed.
+- [x] **P1:** ETag/conditional GET for the SimplifyJobs feed. Done. Cache is invalidated when filter settings change, refetched in full at least hourly, and skipped on dry runs. Verified live: second request got HTTP 304 in about 0.08 s.
 - [ ] **P2:** per-thread `requests.Session`. Measure `--dry-run` time before and after.
 - [ ] **R7 + R8:** throttle the Notion stats refresh; look up master-log rows by `Link` filter instead of scanning the whole table.
 - [x] **R1 (real fix):** one stale source is now a warning; the run fails for a broad outage (10%+ of sources), stuck deliveries, or a sync error. Done.

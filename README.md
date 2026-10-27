@@ -117,7 +117,7 @@ These files are runtime state. GitHub Actions persists them after each run; loca
 | `delivery_state.json` | Known identities, 30-day fingerprints, legacy `norm:` entries ignored but retained, and pending per-destination queues |
 | `message_map.json` | Recent Discord message IDs and jobs used for 📌 scans |
 | `notion_state.json` | Notion database IDs, users, applied cursor, `pending_applied`, and `pending_pins` |
-| `health.json` | Last completed scan, source successes/failures, matching and new counts, pending deliveries, and sync errors |
+| `health.json` | Last completed scan, source successes/failures, matching and new counts, pending deliveries, parked (given-up) deliveries, sync errors, and the SimplifyJobs ETag cache (an unchanged feed is skipped via HTTP 304, refetched in full at least hourly and whenever filter settings change) |
 
 `health.json` is also the run's operational summary: a source failure, pending delivery, or Notion sync error is reported explicitly and retried through durable state. A failing source records `failing_since` and only fails the run (and triggers failure alerts) once it has been down for 5 hours; pending deliveries and sync errors fail the run immediately.
 
