@@ -52,17 +52,23 @@ In `watcher.deliver`:
 2. Commit state only when job state changed (`seen`, `delivery_state`, `message_map`, `notion_state`).
 3. Move state off `main` entirely (see S2 in the security audit). Then history size no longer affects your code repo, and `main` can be protected.
 
-### R6. Duplicated and over-written state (verified)
+### R6. Duplicated and over-written state (verified) — measured 2026-10-27, **not worth changing now**
+Growth is about 100 IDs a day (17,230 IDs on 10-17, 18,253 on 10-27), roughly 1.6 MB a year per file. That's too slow to justify pruning, and the duplicate `known_ids` is deliberate crash protection that `tests/test_pipeline.py` asserts. A bug in pruning would re-alert old jobs. Revisit only if the files pass about 10 MB. The original analysis follows.
+
 - `seen.json` and `delivery_state.json["known_ids"]` are the **same 18,253 IDs** (I compared them). That's about 800 KB stored twice and written twice per run. Choose one as the authority.
 - `checkpoint()` rewrites the whole 1.9 MB ledger (`indent=1`, `fsync`) after every single destination. A 50-message Discord batch writes roughly 100 MB. The identity and fingerprint history rarely changes during delivery.
 - Nothing is ever pruned. `identities` has 7,652 entries and `seen` has 18,253, growing forever.
 
 **Fix:** split the pending queue (small, changes constantly) into its own file from the history (large, changes at the end of the scan). Store a `last_seen` timestamp per ID and drop IDs not seen for about 180 days. Never prune an ID that is still live in a source, or you'd re-alert it. Keep this behind a test before turning it on.
 
-### R7. Notion work happens on every run even when nothing changed (by inspection)
+### R7. Notion work happens on every run even when nothing changed (by inspection) — **skipped**
+Throttling needs a persisted timestamp, which would add about 24 `notion_state.json` commits a day and undo the commit savings from R5. It saves about 2 calls per run per user. Revisit when there are many users, and then store the timestamp somewhere that isn't committed.
+
 `notion_sync.run()` runs every 10 minutes. `_update_stats` re-queries every user's whole tracker database and PATCHes the stats callout each time. With one user that's a few calls. With a website and many users it becomes `users × pages-of-100` calls every 10 minutes. **Fix:** refresh stats at most hourly, or only when a status changed (or a pin/applied item was processed).
 
-### R8. The master log scans the whole table (by inspection)
+### R8. The master log scans the whole table (by inspection) — **not done: cannot verify without a Notion token**
+Replacing the scan with a `Link` filter changes how the live master log finds existing rows. A mistake could create duplicate rows or fail writes, and I had no token to test against. To size the problem first, count the master database's rows from a machine that has `NOTION_TOKEN`. If it's in the thousands, build the filtered lookup with a test against a scratch Notion page.
+
 `log_master` → `_upsert_row` → `_pages(master_db)` pages the **entire** master database (100 rows per call) the first time any job is logged in a run, then does a linear `job_identity()` scan per job. Notion allows about 3 requests/second, so a database with thousands of rows takes tens of seconds per run that has any new job. I did not measure the master DB's size.
 
 **Fix:** since the watcher already dedupes with `seen`, look up a row by the `Link` property with a filtered query (one call per new job), or keep an identity → page ID map in state.
@@ -74,7 +80,9 @@ In `watcher.deliver`:
 ### P1. The SimplifyJobs feed is 13 MB, fetched every 10 minutes (verified)
 `listings.json` is **13,074,080 bytes**. At 144 runs a day that's about 1.9 GB per day of download for a file that changes a few times an hour. GitHub's raw host returns an `ETag` (I confirmed one). **Fix:** conditional GET. Send `If-None-Match`; on HTTP 304 skip the feed for this run (nothing new can appear). Store the ETag next to the source health record. Include a hash of the relevant config (terms, keywords, `max_age_days`) in the cache key so a config change forces a refetch.
 
-### P2. No connection reuse (by inspection)
+### P2. No connection reuse (by inspection) — **measured, dropped**
+Timing all 172 boards with 16 threads gave plain `requests.get`: 14.4 s and 14.2 s; thread-local `Session`: 4.8 s and 16.7 s. The variance swamps any gain, and the change would require rewriting many test mocks. Not worth it.
+
 Every call is a bare `requests.get`, so each of the 166 Greenhouse/Ashby requests opens a new TLS connection to the same two hosts. A `requests.Session` per worker thread (Sessions aren't fully thread-safe, so use `threading.local`) reuses connections. I haven't measured the gain. Time a full `python watcher.py --dry-run` before and after.
 
 ### P3. Poll cold boards less often (optional)

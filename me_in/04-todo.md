@@ -24,10 +24,10 @@ Ground rules for every change: keep the tests green (`python3 -m unittest discov
 ## Phase 2 — Make the pipeline cheaper and cleaner
 
 - [x] **R5:** `trim_health_noise.py` runs before the commit step and restores `health.json` when only timestamps/counts changed (replayed on real history: about half of bot commits would be skipped). Prepared on the branch; takes effect when the owner merges to `main`.
-- [ ] **R6:** one authority for seen IDs; split the pending queue from history; prune IDs not seen for about 180 days (behind a test).
+- [x] **R6:** evaluated and skipped. Growth is only about 100 IDs a day (1.6 MB a year), and pruning risks re-alerts.
 - [x] **P1:** ETag/conditional GET for the SimplifyJobs feed. Done. Cache is invalidated when filter settings change, refetched in full at least hourly, and skipped on dry runs. Verified live: second request got HTTP 304 in about 0.08 s.
-- [ ] **P2:** per-thread `requests.Session`. Measure `--dry-run` time before and after.
-- [ ] **R7 + R8:** throttle the Notion stats refresh; look up master-log rows by `Link` filter instead of scanning the whole table.
+- [x] **P2:** measured, no reliable gain. Dropped (see `02-optimizations.md`).
+- [x] **R7 + R8:** evaluated and deferred. R7 would add state commits; R8 can't be verified without a Notion token. See `02-optimizations.md`.
 - [x] **R1 (real fix):** one stale source is now a warning; the run fails for a broad outage (10%+ of sources), stuck deliveries, or a sync error. Done.
 - [x] **S8:** `requests==2.32.5` pinned, Dependabot added for pip and Actions. Done. Actions are still tag-pinned, not SHA-pinned (Dependabot will keep them current).
 
