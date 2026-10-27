@@ -36,6 +36,7 @@ from pathlib import Path
 import requests
 
 from job_utils import canonical_url, job_identity, load_json, save_json
+from net_safety import host_is, safe_get_text
 from project_config import DEFAULT_FOLLOW_UP_DAYS, follow_up_days
 
 _PAGE_CACHE = {}
@@ -308,6 +309,10 @@ _PATH_SLUG_HOSTS = ("greenhouse.io", "lever.co", "ashbyhq.com",
 _UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 
+def _q(part):
+    return urllib.parse.quote(part, safe="")
+
+
 def _humanize(slug):
     """creditkarma -> Creditkarma, ExpediaGroup -> Expedia Group,
     al-warren-oil -> Al Warren Oil."""
@@ -351,10 +356,10 @@ def _company_from_url(url):
     parsed = urllib.parse.urlparse(url)
     host = parsed.hostname or ""
     parts = [p for p in parsed.path.split("/") if p]
-    if host.endswith("myworkdayjobs.com"):
+    if host_is(host, "myworkdayjobs.com"):
         return _humanize(host.split(".")[0])             # tenant subdomain
     for dom in _PATH_SLUG_HOSTS:
-        if host.endswith(dom) and parts:
+        if host_is(host, dom) and parts:
             return _humanize(parts[0])
     labels = host.split(".")
     if len(labels) >= 2 and labels[-2] not in _BRAND_DOMAINS:
@@ -378,7 +383,7 @@ def _ats_api(url):
     uuid = next((s for s in parts if _UUID_RE.fullmatch(s)), None)
     q = urllib.parse.parse_qs(p.query)
     try:
-        if host.endswith("greenhouse.io") and parts:
+        if host_is(host, "greenhouse.io") and parts:
             board, jid = parts[0], None
             if "jobs" in parts:
                 i = parts.index("jobs")
@@ -387,30 +392,30 @@ def _ats_api(url):
             # The board endpoint carries the clean company name (og:title on the
             # page is the company on some boards but the role on others, so it
             # can't be trusted); the job endpoint carries role + location.
-            bn = _json(f"https://boards-api.greenhouse.io/v1/boards/{board}")
+            bn = _json(f"https://boards-api.greenhouse.io/v1/boards/{_q(board)}")
             company = bn.get("name") if bn else None
             role = location = None
             if jid:
-                d = _json(f"https://boards-api.greenhouse.io/v1/boards/{board}"
-                          f"/jobs/{jid}")
+                d = _json(f"https://boards-api.greenhouse.io/v1/boards/{_q(board)}"
+                          f"/jobs/{_q(jid)}")
                 if d:
                     role = d.get("title")
                     location = (d.get("location") or {}).get("name", "")
             if company or role:
                 return {"company": company, "role": role,
                         "location": location or ""}
-        elif host.endswith("lever.co") and parts and uuid:
-            d = _json(f"https://api.lever.co/v0/postings/{parts[0]}/{uuid}")
+        elif host_is(host, "lever.co") and parts and uuid:
+            d = _json(f"https://api.lever.co/v0/postings/{_q(parts[0])}/{uuid}")
             if d:
                 return {"company": None, "role": d.get("text"),
                         "location": (d.get("categories") or {}).get("location", "")}
-        elif host.endswith("ashbyhq.com") and parts and uuid:
-            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{parts[0]}")
+        elif host_is(host, "ashbyhq.com") and parts and uuid:
+            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{_q(parts[0])}")
             for j in (d or {}).get("jobs", []):
                 if j.get("id") == uuid:
                     return {"company": None, "role": j.get("title"),
                             "location": j.get("location", "")}
-        elif host.endswith("smartrecruiters.com") and parts:
+        elif host_is(host, "smartrecruiters.com") and parts:
             cid = None
             if "company" in parts:
                 i = parts.index("company")
@@ -418,8 +423,8 @@ def _ats_api(url):
             cid = cid or q.get("dcr_ci", [None])[0] or parts[0]
             pid = uuid or next((s for s in reversed(parts) if s.isdigit()), None)
             if cid and pid:
-                d = _json(f"https://api.smartrecruiters.com/v1/companies/{cid}"
-                          f"/postings/{pid}")
+                d = _json(f"https://api.smartrecruiters.com/v1/companies/{_q(cid)}"
+                          f"/postings/{_q(pid)}")
                 if d:
                     loc = d.get("location") or {}
                     loc_s = ", ".join(x for x in (loc.get("city"),
@@ -452,14 +457,14 @@ def _parse_job_from_url(url):
     """
     og_title = og_site = title_tag = None
     try:
-        r = requests.get(
-            url, headers={"User-Agent":
-                          "internship-watcher/1.0 (+notion applied sync)"},
+        fetched = safe_get_text(
+            url, headers={"User-Agent": "internship-watcher/1.0 (+notion applied sync)"},
             timeout=20)
-        if r.status_code == 200:
-            og_title = _meta(r.text, "og:title")
-            og_site = _meta(r.text, "og:site_name")
-            m = re.search(r"<title[^>]*>(.*?)</title>", r.text,
+        if fetched and fetched[0] == 200:
+            page = fetched[1]
+            og_title = _meta(page, "og:title")
+            og_site = _meta(page, "og:site_name")
+            m = re.search(r"<title[^>]*>(.*?)</title>", page,
                           re.IGNORECASE | re.DOTALL)
             title_tag = html.unescape(m.group(1)).strip() if m else None
     except requests.exceptions.RequestException:
@@ -711,7 +716,7 @@ def _posting_open(url, company=None, boards=None):
     try:
         jid = q.get("gh_jid", [None])[0]
         board = None
-        if host.endswith("greenhouse.io") and parts:
+        if host_is(host, "greenhouse.io") and parts:
             board = parts[0]
             if not jid and "jobs" in parts:
                 i = parts.index("jobs")
@@ -722,14 +727,14 @@ def _posting_open(url, company=None, boards=None):
                 board = slug
         if board and jid:
             r = requests.get(f"https://boards-api.greenhouse.io/v1/boards/"
-                             f"{board}/jobs/{jid}", timeout=15)
+                             f"{_q(board)}/jobs/{_q(jid)}", timeout=15)
             return {200: True, 404: False}.get(r.status_code)
-        if host.endswith("lever.co") and parts and uuid:
-            r = requests.get(f"https://api.lever.co/v0/postings/{parts[0]}"
+        if host_is(host, "lever.co") and parts and uuid:
+            r = requests.get(f"https://api.lever.co/v0/postings/{_q(parts[0])}"
                              f"/{uuid}", timeout=15)
             return {200: True, 404: False}.get(r.status_code)
-        if host.endswith("ashbyhq.com") and parts and uuid:
-            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{parts[0]}")
+        if host_is(host, "ashbyhq.com") and parts and uuid:
+            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{_q(parts[0])}")
             if d is None:
                 return None
             return any(j.get("id") == uuid for j in d.get("jobs", []))

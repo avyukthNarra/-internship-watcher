@@ -28,14 +28,14 @@ Ground rules for every change: keep the tests green (`python3 -m unittest discov
 - [ ] **P1:** ETag/conditional GET for the 13 MB SimplifyJobs feed.
 - [ ] **P2:** per-thread `requests.Session`. Measure `--dry-run` time before and after.
 - [ ] **R7 + R8:** throttle the Notion stats refresh; look up master-log rows by `Link` filter instead of scanning the whole table.
-- [ ] **R1 (real fix):** exit non-zero only for stuck deliveries, sync errors, or a broad outage; report single stale sources as warnings.
-- [ ] **S8:** pin `requests`, pin actions to SHAs, add `.github/dependabot.yml`.
+- [x] **R1 (real fix):** one stale source is now a warning; the run fails for a broad outage (10%+ of sources), stuck deliveries, or a sync error. Done.
+- [x] **S8:** `requests==2.32.5` pinned, Dependabot added for pip and Actions. Done. Actions are still tag-pinned, not SHA-pinned (Dependabot will keep them current).
 
 ## Phase 3 — Input hardening
 
-- [ ] **S3:** `net_safety.safe_get()` (scheme allowlist, private-IP block, redirect re-check, 1 MB cap). Use it in `_parse_job_from_url` and `_posting_open`.
+- [x] **S3:** `net_safety.safe_get_text()` guards `_parse_job_from_url` (scheme allowlist, private-IP block, per-hop redirect check, 1 MB cap). Done. `_posting_open` only calls fixed ATS API hosts, so it was left alone. DNS rebinding is narrowed, not eliminated.
 - [ ] **S5:** `allowed_user_ids` in config, per-message and per-run URL caps, and a cap on tracker creations per run.
-- [ ] **S7:** shared `host_is()` helper and `quote()` on path segments in API URLs.
+- [x] **S7:** `host_is()` and `quote()` applied in `notion_sync.py`. Done.
 
 ## Phase 4 — Privacy and state (do this before the website)
 
