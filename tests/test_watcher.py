@@ -212,6 +212,14 @@ class DeliveryTests(unittest.TestCase):
         self.assertIn(('PATCH', 'issues/7', {'state': 'closed', 'state_reason': 'completed'}),
                       [c.args for c in api.call_args_list])
 
+    def test_removed_source_closes_issue(self):
+        url = 'https://boards-api.greenhouse.io/v1/boards/removed/jobs'
+        previous = {url: {'ok': False, 'error': 'HTTP 404', 'failing_since': 1, 'issue': 7}}
+        _, sources, api = self.run_with_sources({}, previous)
+        self.assertEqual(sources, {})
+        self.assertIn(('PATCH', 'issues/7', {'state': 'closed', 'state_reason': 'completed'}),
+                      [c.args for c in api.call_args_list])
+
     def test_broad_outage_still_fails_run(self):
         down = {f'https://example.invalid/{i}': {'ok': False, 'error': 'Timeout', 'failing_since': 1}
                 for i in range(watcher.MAX_STALE_SOURCES + 1)}

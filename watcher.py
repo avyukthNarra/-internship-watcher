@@ -483,8 +483,8 @@ def open_source_issue(url, source, cfg, now):
     return issue and issue.get("number")
 
 
-def close_source_issue(number):
-    github_api("POST", f"issues/{number}/comments", {"body": "Source recovered; closing."})
+def close_source_issue(number, reason="Source recovered; closing."):
+    github_api("POST", f"issues/{number}/comments", {"body": reason})
     github_api("PATCH", f"issues/{number}", {"state": "closed", "state_reason": "completed"})
 
 
@@ -591,6 +591,10 @@ def main(argv=None):
                                        or old_sources.get(key, {}).get("failing_since") or now)
             if old_sources.get(key, {}).get("issue"):
                 source["issue"] = old_sources[key]["issue"]
+    # A board removed from config (or moved to a new slug) is no longer fetched.
+    for key, source in old_sources.items():
+        if key not in current_sources and source.get("issue"):
+            close_source_issue(source["issue"], "Source no longer watched; closing.")
     failures = sum(not v.get("ok") for v in current_sources.values())
     stale = sorted(k for k, v in current_sources.items()
                    if not v.get("ok") and now - v["failing_since"] >= SOURCE_ALERT_AFTER)
