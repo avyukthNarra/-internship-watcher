@@ -13,13 +13,13 @@ Ground rules for every change: keep the tests green (`python3 -m unittest discov
 
 ## Phase 1 — Stop the bleeding (small, safe changes)
 
-- [ ] **R1:** fix or remove the `oldmissioncapital` board. Runs have been failing for about 150 hours because of it.
-- [ ] **S4:** pass `ssl.create_default_context()` to `starttls()`.
-- [ ] **J1 + J2:** word-boundary the include and exclude keyword matching. Add tests for "International…", "Internet…", "Salesforce Developer Intern", "Marketing Technology Engineer Intern".
-- [ ] **R3 + R4 + S6:** add a `clean_job()` step at the fetch boundary (strings only, strip control characters, require `http(s)` URLs, default the title). Add a test with `null` fields.
-- [ ] **R2:** catch `Exception` per destination, add an attempt cap and a `dead` list, and stop counting dead items toward the failure exit code.
-- [ ] **J4:** point `simplify.url` at the `Summer2027-Internships` path.
-- [ ] **S9:** add `allowed_mentions: { parse: [] }` to the pinger's Discord post.
+- [x] **R1 (board):** `oldmissioncapital` moved to Ashby (`old-mission-capital`). Done 2026-10-27.
+- [x] **S4:** `starttls()` now verifies the certificate. Done.
+- [x] **J1 + J2:** whole-word keyword matching with tests. Done. ("Marketing Technology Engineer Intern" is still excluded; see `02-optimizations.md` J2.)
+- [x] **R3 + R4 + S6:** `clean_job()` plus Discord link escaping, with tests. Done.
+- [x] **R2:** per-destination catch-all, 20-attempt cap, `dead` list, not counted as pending. Done (committed locally).
+- [x] **J4 (URL):** `SIMPLIFY_URL` points at `Summer2027-Internships`. Done.
+- [x] **S9 (mentions):** pinger sets `allowed_mentions`. Done. Token scope still to confirm.
 
 ## Phase 2 — Make the pipeline cheaper and cleaner
 
