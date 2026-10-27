@@ -23,6 +23,35 @@ def page(j, status='Saved', pid='page-1'):
         'Role': {'title': [{'plain_text': j['title']}]}}}
 
 
+class KeywordTests(unittest.TestCase):
+    INCLUDE = ["intern", "internship", "co-op", "coop"]
+    EXCLUDE = ["internal", "sales", "marketing", "mba", " mba", "mba ", "ph.d", "hr intern"]
+
+    def check(self, title):
+        return watcher.matches(title, self.INCLUDE, self.EXCLUDE)
+
+    def test_intern_is_a_whole_word(self):
+        for title in ("Software Engineer Intern", "Software Engineering Interns",
+                      "Data Science Intern, Summer 2027", "Backend Co-op", "SWE Internship"):
+            self.assertTrue(self.check(title), title)
+        for title in ("International Payments Engineer", "Internet Infrastructure Engineer",
+                      "Internal Tools Engineer"):
+            self.assertFalse(self.check(title), title)
+
+    def test_exclusions_do_not_hide_engineering_roles(self):
+        self.assertTrue(self.check("Salesforce Developer Intern"))
+        self.assertFalse(self.check("Sales Intern"))
+        self.assertFalse(self.check("Marketing Intern"))
+        self.assertFalse(self.check("MBA Intern"))
+        self.assertFalse(self.check("HR Intern"))
+        self.assertFalse(self.check("PH.D. Research Intern"))
+
+    def test_missing_title_and_empty_lists(self):
+        self.assertFalse(watcher.matches(None, self.INCLUDE, self.EXCLUDE))
+        self.assertFalse(watcher.matches("SWE Intern", [], []))
+        self.assertTrue(watcher.matches("SWE Intern", self.INCLUDE, []))
+
+
 class IdentityTests(unittest.TestCase):
     def test_preserves_job_query_and_fragments(self):
         url = 'https://careers.example.com/job?gh_jid=123&utm_source=mail&lang=en#/apply'

@@ -14,11 +14,13 @@ import argparse
 import os
 import re
 import smtplib
+import ssl
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
+from functools import lru_cache
 from pathlib import Path
 
 import requests
@@ -37,7 +39,7 @@ MSG_MAP_PATH = ROOT / "message_map.json"  # discord message id -> job, for 📌 
 
 SIMPLIFY_URL = (
     "https://raw.githubusercontent.com/SimplifyJobs/"
-    "Summer2026-Internships/dev/.github/scripts/listings.json"
+    "Summer2027-Internships/dev/.github/scripts/listings.json"
 )
 
 HEADERS = {"User-Agent": "internship-watcher/1.0 (personal job alert script)"}
@@ -46,13 +48,20 @@ TIMEOUT = 20
 
 # ---------------------------------------------------------------- utilities
 
+@lru_cache(maxsize=None)
+def _keyword_regex(keywords):
+    """Whole-word match (optional plural s), so "intern" skips "International"
+    and "sales" skips "Salesforce"."""
+    parts = [re.escape(k.strip().lower()) for k in keywords if k.strip()]
+    return re.compile(r"(?<!\w)(?:" + "|".join(parts) + r")s?(?!\w)") if parts else None
+
+
 def matches(title: str, include_kw, exclude_kw) -> bool:
-    t = title.lower()
-    if not any(k.lower() in t for k in include_kw):
+    t = (title or "").lower()
+    include, exclude = _keyword_regex(tuple(include_kw)), _keyword_regex(tuple(exclude_kw))
+    if include is None or not include.search(t):
         return False
-    if any(k.lower() in t for k in exclude_kw):
-        return False
-    return True
+    return exclude is None or not exclude.search(t)
 
 
 SOURCE_HEALTH = {}
@@ -321,7 +330,7 @@ def notify_email(cfg, jobs):
     msg["To"] = to_addr
 
     with smtplib.SMTP(host, port, timeout=30) as s:
-        s.starttls()
+        s.starttls(context=ssl.create_default_context())
         s.login(user, password)
         s.sendmail(user, [to_addr], msg.as_string())
 
