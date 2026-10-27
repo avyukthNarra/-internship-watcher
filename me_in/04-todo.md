@@ -23,7 +23,7 @@ Ground rules for every change: keep the tests green (`python3 -m unittest discov
 
 ## Phase 2 — Make the pipeline cheaper and cleaner
 
-- [ ] **R5:** stop committing `health.json` every run (or only commit when state changed).
+- [x] **R5:** `trim_health_noise.py` runs before the commit step and restores `health.json` when only timestamps/counts changed (replayed on real history: about half of bot commits would be skipped). Prepared on the branch; takes effect when the owner merges to `main`.
 - [ ] **R6:** one authority for seen IDs; split the pending queue from history; prune IDs not seen for about 180 days (behind a test).
 - [x] **P1:** ETag/conditional GET for the SimplifyJobs feed. Done. Cache is invalidated when filter settings change, refetched in full at least hourly, and skipped on dry runs. Verified live: second request got HTTP 304 in about 0.08 s.
 - [ ] **P2:** per-thread `requests.Session`. Measure `--dry-run` time before and after.
