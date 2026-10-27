@@ -959,6 +959,10 @@
   ],
   "simplify": {
     "enabled": true,
+    "include_categories": [
+      "Hardware",
+      "Quant"
+    ],
     "terms": [
       "Fall 2026",
       "Winter 2027",
@@ -1060,5 +1064,21 @@
   "dedup_days": 30,
   "max_discord_per_run": 50,
   "follow_up_days": 14,
+  "alert_channels": [
+    {
+      "name": "hardware",
+      "webhook_env": "DISCORD_WEBHOOK_HARDWARE",
+      "categories": [
+        "Hardware"
+      ]
+    },
+    {
+      "name": "quant",
+      "webhook_env": "DISCORD_WEBHOOK_QUANT",
+      "categories": [
+        "Quant"
+      ]
+    }
+  ],
   "profiles": {}
 }

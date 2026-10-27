@@ -98,6 +98,10 @@ Wayve is fetched directly from its Ashby board. Postman moved to Workday, which 
 }
 ```
 
+Channels (and profiles) can also match on `categories`, the SimplifyJobs category of a posting (for example `Hardware`, `Quant`, `Software`, `AI/ML/Data`, `Product`). Only SimplifyJobs postings carry a category.
+
+`simplify.include_categories` pulls every SimplifyJobs posting in those categories regardless of company, still subject to the title, location, and season filters. Such postings go to the general channel and any matching alert channel, but not the TOP channel unless the company is one you track. The shipped config pulls `Hardware` and `Quant` and defines `hardware` and `quant` alert channels; those channels stay inactive until you add `DISCORD_WEBHOOK_HARDWARE` and `DISCORD_WEBHOOK_QUANT` to `PERSONAL_WEBHOOKS_JSON`.
+
 Add each channel's webhook URL to the `PERSONAL_WEBHOOKS_JSON` secret under the same name (for example `{"DISCORD_WEBHOOK_QUANT": "https://discord.com/api/webhooks/REDACTED"}`); no workflow change is needed. A channel whose webhook is not set is skipped.
 
 `allowed_user_ids` (optional list of Discord user IDs) restricts who the bot serves. When it is set, 📌 reactions and applied-channel links from anyone else are ignored; when it is absent or empty, everyone is served. Applied-channel intake is also bounded: at most 5 links per message (extras get a ⚠️ reaction) and 20 links read per run, with the rest picked up on later runs.

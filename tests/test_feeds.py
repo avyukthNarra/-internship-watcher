@@ -113,6 +113,49 @@ class FilteringAndRoutingTests(unittest.TestCase):
             self.assertEqual(watcher.destinations(farmers, cfg), ["discord:DISCORD_WEBHOOK_URL"])
 
 
+class CategoryTests(unittest.TestCase):
+    def listing(self, jid, company, category):
+        return {"id": jid, "active": True, "date_posted": time.time(), "company_name": company,
+                "title": "Firmware Intern", "locations": ["Austin, TX"], "url": f"https://x.example/{jid}",
+                "terms": ["Summer 2027"], "category": category}
+
+    def fetch(self, **simplify):
+        data = [self.listing("1", "Google", "Software"), self.listing("2", "Rockwell", "Hardware"),
+                self.listing("3", "Rockwell", "Software"), self.listing("4", "Jump", "Quant")]
+        cfg = {"simplify": {"enabled": True, "company_keywords": ["google"], **simplify}}
+        with patch.object(watcher, "source_items", return_value=data):
+            return {j["id"]: j for j in watcher.fetch_simplify(cfg)}
+
+    def test_categories_are_pulled_regardless_of_company(self):
+        self.assertEqual(set(self.fetch()), {"simplify:1"})
+        found = self.fetch(include_categories=["hardware", "Quant"])
+        self.assertEqual(set(found), {"simplify:1", "simplify:2", "simplify:4"})
+        self.assertNotIn("via_category", found["simplify:1"])
+        self.assertTrue(found["simplify:2"]["via_category"])
+        self.assertEqual(found["simplify:2"]["category"], "Hardware")
+
+    def test_category_jobs_skip_top_channel_and_feed_category_channels(self):
+        cfg = {"companies": [], "simplify": {"company_keywords": ["google"]},
+               "alert_channels": [{"name": "hw", "webhook_env": "DISCORD_WEBHOOK_HW",
+                                   "categories": ["hardware"]}]}
+        env = {"DISCORD_WEBHOOK_URL": "d", "DISCORD_WEBHOOK_URL_TOP": "t", "DISCORD_WEBHOOK_HW": "h"}
+        hardware = {"id": "simplify:2", "company": "Rockwell", "title": "x", "location": "", "url": "u",
+                    "category": "Hardware", "via_category": True}
+        software = {**hardware, "id": "simplify:3", "category": "Software"}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(watcher.destinations(hardware, cfg),
+                             ["discord:DISCORD_WEBHOOK_URL", "discord:DISCORD_WEBHOOK_HW"])
+            self.assertEqual(watcher.destinations(software, cfg), ["discord:DISCORD_WEBHOOK_URL"])
+            tracked = {**hardware, "company": "Google", "via_category": False}
+            self.assertEqual(watcher.destinations(tracked, cfg)[0], "discord:DISCORD_WEBHOOK_URL_TOP")
+
+    def test_category_lists_are_validated(self):
+        from project_config import validate_config
+        validate_config({"companies": [], "simplify": {"include_categories": ["Hardware"]}})
+        with self.assertRaises(ValueError):
+            validate_config({"companies": [], "simplify": {"include_categories": "Hardware"}})
+
+
 class AlertChannelTests(unittest.TestCase):
     CFG = {"companies": [], "alert_channels": [
         {"name": "quant", "webhook_env": "DISCORD_WEBHOOK_QUANT", "companies": ["Jane Street", "Citadel"]},

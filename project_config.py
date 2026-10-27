@@ -46,7 +46,7 @@ def validate_config(cfg):
                           "allowed_user_ids"))
     _booleans(cfg, ("keep_unknown_terms",))
 
-    for name, list_keys in (("simplify", ("terms", "company_keywords")),
+    for name, list_keys in (("simplify", ("terms", "company_keywords", "include_categories")),
                             ("jobright", ("repos",))):
         feed = cfg.get(name, {})
         if not isinstance(feed, dict):
@@ -63,7 +63,7 @@ def validate_config(cfg):
     for profile in profiles.values():
         if not isinstance(profile, dict):
             raise ValueError("Each profile must be an object")
-        _string_lists(profile, ("roles", "companies", "locations", "terms"), "Profile ")
+        _string_lists(profile, ("roles", "companies", "locations", "terms", "categories"), "Profile ")
         _non_negative_integers(profile, ("follow_up_days",), "Profile ")
         _booleans(profile, ("keep_unknown_terms",), "Profile ")
         if "webhook_env" in profile and (not isinstance(profile["webhook_env"], str)
@@ -83,7 +83,8 @@ def _validate_alert_channels(channels):
         if not isinstance(channel.get("webhook_env"), str) \
                 or not channel["webhook_env"].startswith("DISCORD_WEBHOOK_"):
             raise ValueError("Alert channel webhook_env must begin DISCORD_WEBHOOK_")
-        _string_lists(channel, ("roles", "companies", "locations", "terms"), "Alert channel ")
+        _string_lists(channel, ("roles", "companies", "locations", "terms", "categories"),
+                      "Alert channel ")
         _booleans(channel, ("keep_unknown_terms",), "Alert channel ")
 
 

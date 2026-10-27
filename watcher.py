@@ -236,6 +236,7 @@ def fetch_simplify(cfg):
     if SOURCE_HEALTH.get(url, {}).get("ok") and SOURCE_HEALTH[url].get("etag"):
         SOURCE_HEALTH[url] = {**SOURCE_HEALTH[url], "filter_digest": digest, "full_fetch": time.time()}
     company_filter = [c.lower() for c in sim.get("company_keywords", [])]
+    categories = {c.lower() for c in sim.get("include_categories", [])}
     min_age_days = sim.get("max_age_days", 14)
     cutoff = time.time() - min_age_days * 86400
 
@@ -246,18 +247,23 @@ def fetch_simplify(cfg):
         if j.get("date_posted", 0) < cutoff:
             continue
         company = j.get("company_name", "")
-        if company_filter and not company_matches(company, company_filter):
+        category = j.get("category") or ""
+        by_company = not company_filter or company_matches(company, company_filter)
+        by_category = category.lower() in categories
+        if not (by_company or by_category):
             continue
-        out.append(
-            {
-                "id": f"simplify:{j.get('id')}",
-                "terms": j.get("terms", []),
-                "company": company,
-                "title": j.get("title", ""),
-                "location": ", ".join(j.get("locations", [])[:3]),
-                "url": j.get("url", ""),
-            }
-        )
+        job = {
+            "id": f"simplify:{j.get('id')}",
+            "terms": j.get("terms", []),
+            "company": company,
+            "title": j.get("title", ""),
+            "location": ", ".join(j.get("locations", [])[:3]),
+            "url": j.get("url", ""),
+            "category": category,
+        }
+        if not by_company:
+            job["via_category"] = True  # wanted for its category, not a company you track
+        out.append(job)
     return out
 
 
@@ -439,7 +445,8 @@ def select_new(jobs, seen, ledger, now, ttl_days=DEFAULT_DEDUP_DAYS):
 def destinations(job, cfg):
     result = []
     top_names = {c["name"].lower() for c in cfg.get("companies", [])}
-    top = (job["id"].split(":", 1)[0] in ("greenhouse", "lever", "ashby", "simplify")
+    top = ((job["id"].split(":", 1)[0] in ("greenhouse", "lever", "ashby", "simplify")
+            and not job.get("via_category"))
            or job["company"].lower() in top_names
            or company_matches(job["company"], cfg.get("simplify", {}).get("company_keywords", [])))
     hook = "DISCORD_WEBHOOK_URL_TOP" if top and os.environ.get("DISCORD_WEBHOOK_URL_TOP") else "DISCORD_WEBHOOK_URL"
