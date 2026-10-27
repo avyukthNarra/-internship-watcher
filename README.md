@@ -81,6 +81,8 @@ With no delivery credentials, or with `python watcher.py --dry-run`, the watcher
 
 `config.json` contains the `companies` entries plus explicit defaults for `terms`, `keep_unknown_terms`, `dedup_days` (30), `max_discord_per_run` (50), `follow_up_days` (14), and `profiles` (an empty object unless configured). It also contains the SimplifyJobs and Jobright feed settings. Add a board only after verifying its slug with `verify_boards.py`; unsupported or stale slugs can return 404. The configured `exclude_locations` list uses word-boundary matching and keeps locations that clearly contain a US state or USA. Empty or unknown locations are retained.
 
+To find boards you don't track yet, `discover_boards.py` tries likely Greenhouse, Lever, and Ashby slugs for a list of company names (`--names file.txt`) or for the open Y Combinator list of companies that are hiring (`--yc --min-team 10`). It prints boards with matching internship postings for you to review and never edits `config.json`; verify each pick with `verify_boards.py --candidate ATS BOARD` before adding it. A board listed under `[NAME DIFFERS - check]` may belong to a different company with a similar name.
+
 Wayve is fetched directly from its Ashby board. Postman moved to Workday, which the watcher does not fetch directly; it is included in the SimplifyJobs company filter and remains eligible for Jobright routing. Postman alerts depend on those feeds publishing matching jobs within the configured age window.
 
 ### Alert channels

@@ -57,6 +57,10 @@ This is the 90% case and needs no code.
 
 `name` is what shows up in Discord and decides whether a job goes to the "top" webhook (`DISCORD_WEBHOOK_URL_TOP`). Any job from a configured board counts as top.
 
+## Finding boards you don't track yet
+
+`python3 discover_boards.py --names companies.txt` (one name per line) or `--yc --min-team 10` guesses slugs from each company's name and website, probes Greenhouse, Lever and Ashby, and lists boards with internship postings. It never edits `config.json`. On 2026-10-27 it checked 780 YC companies in about 3 minutes and found 34 boards with internship postings. Read the list, drop non-fits, run `verify_boards.py --candidate ATS BOARD` on the rest, then add them. Expect a one-time burst of alerts for a new board's current postings.
+
 ## Adding a company on a different ATS (new adapter)
 
 Example: SmartRecruiters. Four small edits.
