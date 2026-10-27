@@ -60,8 +60,8 @@ jobs:
                (api.lever.co/v0/postings/<slug>?mode=json) and Ashby
                (api.ashbyhq.com/posting-api/job-board/<slug>), and check the company's
                careers page for links to its applicant tracking system.
-            3. If the company moved to a supported ATS, verify the new slug returns jobs
-               (for example with a small one-off check modeled on verify_boards.py) and
+            3. If the company moved to a supported ATS, verify the new slug with
+               `python verify_boards.py --candidate <ats> <slug>` (it must exit 0) and
                update the entry. If it moved to an unsupported system (Workday, etc.) or
                stopped hiring, remove the entry; the SimplifyJobs and Jobright feeds still
                cover it. If the failure is transient (5xx, timeouts) and the endpoint works

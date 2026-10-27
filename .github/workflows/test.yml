@@ -7,7 +7,7 @@ on:
       - 'config.json'
       - 'requirements.txt'
       - 'internship-pinger/**'
-      - '.github/workflows/test.yml'
+      - '.github/workflows/**'
 permissions:
   contents: read
 jobs:

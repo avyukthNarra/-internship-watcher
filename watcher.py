@@ -2,17 +2,15 @@
 """
 Internship Watcher
 ------------------
-Polls public job-board APIs (Greenhouse, Lever, Ashby) for the companies in
-config.json, plus the SimplifyJobs aggregated internship feed, filters for
-internship roles matching your keywords, dedupes against seen.json, and sends
-notifications via Discord webhook and/or email.
+Polls company boards and the SimplifyJobs and Jobright feeds, filters matching
+internships, deduplicates against durable history, and queues delivery to
+Discord, email, and Notion.
 
 Designed to run on a schedule (GitHub Actions cron, or local cron). Each run
 checkpoints delivery, deduplication, and tracker state for safe retries.
 """
 
 import argparse
-import json
 import os
 import re
 import smtplib
@@ -28,6 +26,11 @@ import requests
 
 from job_utils import (load_json, save_json, canonical_url, job_identity,
                        fingerprint, term_matches, preference_matches)
+from job_feeds import board_url, feed_items
+from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT,
+                            load_personal_webhooks, notifications_enabled, validate_config)
+from source_health import (MAX_STALE_SOURCES, SOURCE_ALERT_AFTER, build_health,
+                           health_summary, health_exit_code)
 
 ROOT = Path(__file__).parent
 CONFIG_PATH = ROOT / "config.json"
@@ -55,10 +58,6 @@ def matches(title: str, include_kw, exclude_kw) -> bool:
 
 
 SOURCE_HEALTH = {}
-# Boards move ATS or blip; a source down this long is reported as a GitHub issue.
-SOURCE_ALERT_AFTER = 5 * 3600
-# One dead board gets an issue, not a failed run; this many at once is an outage.
-MAX_STALE_SOURCES = 5
 SOURCE_ISSUE_LABEL = "source-down"
 
 
@@ -92,7 +91,7 @@ def get_text(url):
 
 
 def norm_key(job) -> str:
-    """Company+title fingerprint for deduping the same job across sources."""
+    """Legacy fingerprint retained for compatibility; no longer used for matching."""
     return "norm:" + re.sub(r"[^a-z0-9]+", "", (job["company"] + job["title"]).lower())
 
 
@@ -126,22 +125,20 @@ def location_excluded(location: str, patterns) -> bool:
 # ------------------------------------------------------------- ATS fetchers
 
 def source_items(url, key=None):
-    previous_success = SOURCE_HEALTH.get(url, {}).get("last_success")
+    previous = dict(SOURCE_HEALTH.get(url, {}))
     data = get(url)
     if data is None:
         return []
-    items = data.get(key) if key and isinstance(data, dict) else data if not key else None
-    if not isinstance(items, list) or not all(isinstance(j, dict) and j.get("id") is not None for j in items):
-        SOURCE_HEALTH[url] = {"ok": False, "error": "Unexpected feed schema"}
-        if previous_success is not None:
-            SOURCE_HEALTH[url]["last_success"] = previous_success
+    items = feed_items(data, key)
+    if items is None:
+        SOURCE_HEALTH[url] = {**previous, "ok": False, "error": "Unexpected feed schema"}
         return []
     return items
 
 
 def fetch_greenhouse(board: str):
     """Greenhouse public board API."""
-    data = source_items(f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs", "jobs")
+    data = source_items(board_url("greenhouse", board), "jobs")
     return [
         {
             "id": f"greenhouse:{board}:{j['id']}",
@@ -155,7 +152,7 @@ def fetch_greenhouse(board: str):
 
 def fetch_lever(org: str):
     """Lever public postings API."""
-    data = source_items(f"https://api.lever.co/v0/postings/{org}?mode=json")
+    data = source_items(board_url("lever", org))
     return [
         {
             "id": f"lever:{org}:{j.get('id')}",
@@ -169,7 +166,7 @@ def fetch_lever(org: str):
 
 def fetch_ashby(org: str):
     """Ashby public job-board API."""
-    data = source_items(f"https://api.ashbyhq.com/posting-api/job-board/{org}", "jobs")
+    data = source_items(board_url("ashby", org), "jobs")
     return [
         {
             "id": f"ashby:{org}:{j.get('id')}",
@@ -364,26 +361,28 @@ def discover(cfg):
             and term_matches(j, terms, cfg.get("keep_unknown_terms", True))]
 
 
-def select_new(jobs, seen, ledger, now, ttl_days=30):
+def select_new(jobs, seen, ledger, now, ttl_days=DEFAULT_DEDUP_DAYS):
     """Exact identities persist; fuzzy cross-source fingerprints expire."""
     identities = ledger.setdefault("identities", {})
-    prints = ledger.setdefault("fingerprints", {})
+    recent_fingerprints = ledger.setdefault("fingerprints", {})
     cutoff = now - ttl_days * 86400
-    prints = ledger["fingerprints"] = {k: v for k, v in prints.items() if v >= cutoff}
+    recent_fingerprints = {key: timestamp for key, timestamp in recent_fingerprints.items()
+                           if timestamp >= cutoff}
+    ledger["fingerprints"] = recent_fingerprints
     new = []
     # Existing IDs seed current fingerprints without resurrecting old alerts.
     for j in jobs:
         if j["id"] in seen:
             identities[job_identity(j)] = j["id"]
-            prints.setdefault(fingerprint(j), now)
+            recent_fingerprints.setdefault(fingerprint(j), now)
     for j in jobs:
         identity, fp = job_identity(j), fingerprint(j)
         if j["id"] not in seen and identity not in identities:
-            if not (j.get("agg") and fp in prints):
+            if not (j.get("agg") and fp in recent_fingerprints):
                 new.append(j)
         seen.add(j["id"])
         identities[identity] = j["id"]
-        prints.setdefault(fp, now)
+        recent_fingerprints.setdefault(fp, now)
     return new
 
 
@@ -400,7 +399,7 @@ def destinations(job, cfg):
         result.append("email")
     if os.environ.get("NOTION_TOKEN") and os.environ.get("NOTION_PARENT_PAGE_ID"):
         result.append("notion")
-    for uid, preferences in cfg.get("profiles", {}).items():
+    for preferences in cfg.get("profiles", {}).values():
         hook = preferences.get("webhook_env")
         if hook and os.environ.get(hook) and preference_matches(job, preferences):
             result.append("discord:" + hook)
@@ -409,7 +408,7 @@ def destinations(job, cfg):
 
 def deliver(ledger, cfg, msg_map, checkpoint):
     # Bound work while retaining every undelivered job for the next run.
-    budget = cfg.get("max_discord_per_run", 50)
+    budget = cfg.get("max_discord_per_run", DEFAULT_DISCORD_LIMIT)
     for entry in list(ledger.setdefault("pending", {}).values()):
         for destination in list(entry["destinations"]):
             job = entry["job"]
@@ -441,6 +440,18 @@ def deliver(ledger, cfg, msg_map, checkpoint):
             checkpoint()
     ledger["pending"] = {k: v for k, v in ledger["pending"].items() if v["destinations"]}
     checkpoint()
+
+
+def queue_deliveries(ledger, jobs, seen, cfg, now):
+    """Record delivery intent before sending anything or acknowledging seen IDs."""
+    pending = ledger.setdefault("pending", {})
+    for job in jobs:
+        targets = destinations(job, cfg)
+        if targets:
+            pending.setdefault(job["id"], {
+                "job": job, "destinations": targets, "created": now,
+            })
+    ledger["known_ids"] = sorted(seen)
 
 
 def github_api(method, path, payload=None):
@@ -488,35 +499,36 @@ def close_source_issue(number, reason="Source recovered; closing."):
     github_api("PATCH", f"issues/{number}", {"state": "closed", "state_reason": "completed"})
 
 
-def validate_config(cfg):
-    if not isinstance(cfg, dict) or not isinstance(cfg.get("companies"), list):
-        raise ValueError("config.json must contain a companies list")
-    for company in cfg["companies"]:
-        if not isinstance(company, dict) or not all(isinstance(company.get(k), str) and company[k]
-                                                   for k in ("name", "ats", "board")):
-            raise ValueError("Every company needs name, ats, and board strings")
-        if company["ats"] not in ATS_FETCHERS:
-            raise ValueError("Unsupported ATS: " + company["ats"])
-    for key in ("max_discord_per_run", "dedup_days", "follow_up_days"):
-        if key in cfg and (type(cfg[key]) is not int or cfg[key] < 0):
-            raise ValueError(key + " must be a non-negative integer")
-    for key in ("terms", "include_keywords", "exclude_keywords", "exclude_locations"):
-        if key in cfg and (not isinstance(cfg[key], list) or not all(isinstance(v, str) for v in cfg[key])):
-            raise ValueError(key + " must be a list of strings")
-    if not isinstance(cfg.get("profiles", {}), dict):
-        raise ValueError("profiles must map Discord user IDs to preferences")
-    for profile in cfg.get("profiles", {}).values():
-        if not isinstance(profile, dict):
-            raise ValueError("Each profile must be an object")
-        for key in ("roles", "companies", "locations", "terms"):
-            if key in profile and (not isinstance(profile[key], list)
-                                   or not all(isinstance(v, str) for v in profile[key])):
-                raise ValueError("Profile " + key + " must be a list of strings")
-        if "follow_up_days" in profile and (type(profile["follow_up_days"]) is not int or profile["follow_up_days"] < 0):
-            raise ValueError("Profile follow_up_days must be a non-negative integer")
-        if "webhook_env" in profile and (not isinstance(profile["webhook_env"], str)
-                                         or not profile["webhook_env"].startswith("DISCORD_WEBHOOK_")):
-            raise ValueError("Profile webhook_env must begin DISCORD_WEBHOOK_")
+def track_source_issues(health, previous_sources, cfg):
+    """Open an issue per stale source and close issues for recovered or removed sources."""
+    now, sources = health["last_completed_scan"], health["sources"]
+    for url, previous in previous_sources.items():
+        if not previous.get("issue"):
+            continue
+        if url not in sources:
+            # A board removed from config (or moved to a new slug) is no longer fetched.
+            close_source_issue(previous["issue"], "Source no longer watched; closing.")
+        elif sources[url].get("ok"):
+            close_source_issue(previous["issue"])
+    opened = []
+    for url, source in sorted(sources.items()):
+        if (not source.get("ok") and now - source["failing_since"] >= SOURCE_ALERT_AFTER
+                and not source.get("issue") and (number := open_source_issue(url, source, cfg, now))):
+            source["issue"] = number
+            opened.append(number)
+    if opened and os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
+            stream.write(f"source_issues={' '.join(map(str, opened))}\n")
+
+
+def report_health(health):
+    save_json(ROOT / "health.json", health)
+    summary = health_summary(health)
+    print(summary)
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as stream:
+            stream.write(summary + "\n")
+    return health_exit_code(health)
 
 
 def main(argv=None):
@@ -525,20 +537,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     cfg = load_json(CONFIG_PATH, {})
     validate_config(cfg)
-    # Actions supplies optional personal channels in one JSON secret; only
-    # explicitly named Discord webhook variables may be injected.
-    personal_hooks = json.loads(os.environ.get("PERSONAL_WEBHOOKS_JSON") or "{}")
-    if not isinstance(personal_hooks, dict):
-        raise ValueError("PERSONAL_WEBHOOKS_JSON must be an object")
-    for name, value in personal_hooks.items():
-        if not name.startswith("DISCORD_WEBHOOK_") or not isinstance(value, str):
-            raise ValueError("Personal webhook keys must begin DISCORD_WEBHOOK_")
-        os.environ.setdefault(name, value)
-    enabled = any(os.environ.get(k) for k in ("DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_URL_TOP"))
-    enabled |= bool(os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASS"))
-    enabled |= bool(os.environ.get("NOTION_TOKEN") and os.environ.get("NOTION_PARENT_PAGE_ID"))
-    enabled |= any(os.environ.get(p.get("webhook_env", "")) for p in cfg.get("profiles", {}).values())
-    dry_run = args.dry_run or not enabled
+    load_personal_webhooks()
+    dry_run = args.dry_run or not notifications_enabled(cfg)
     ledger_path = ROOT / "delivery_state.json"
     health_path = ROOT / "health.json"
     ledger = load_json(ledger_path, {})
@@ -547,12 +547,14 @@ def main(argv=None):
     previous_health = load_json(health_path, {})
     SOURCE_HEALTH.clear()
     SOURCE_HEALTH.update(previous_health.get("sources", {}))
-    old_sources = dict(SOURCE_HEALTH)
+    previous_sources = dict(SOURCE_HEALTH)
     all_jobs = discover(cfg)
-    # Retain only sources actually fetched this run.
-    current_sources = {k: v for k, v in SOURCE_HEALTH.items() if v is not old_sources.get(k)}
+    # Fetchers replace a source record on every attempt. An unchanged object
+    # belongs to a source no longer polled and must not stay in current health.
+    current_sources = {url: record for url, record in SOURCE_HEALTH.items()
+                       if record is not previous_sources.get(url)}
     now = time.time()
-    new_jobs = select_new(all_jobs, seen, ledger, now, cfg.get("dedup_days", 30))
+    new_jobs = select_new(all_jobs, seen, ledger, now, cfg.get("dedup_days", DEFAULT_DEDUP_DAYS))
     print(f"Found {len(all_jobs)} matching postings, {len(new_jobs)} new.")
     for j in new_jobs:
         print(f"  NEW: {j['company']} — {j['title']} ({j['url']})")
@@ -560,13 +562,11 @@ def main(argv=None):
         print("Dry run: no state changes, notifications, or Notion calls.")
         return 0
 
-    pending = ledger.setdefault("pending", {})
-    for j in new_jobs:
-        targets = destinations(j, cfg)
-        if targets:
-            pending.setdefault(j["id"], {"job": j, "destinations": targets, "created": now})
-    ledger["known_ids"] = sorted(seen)
-    checkpoint = lambda: save_json(ledger_path, ledger)
+    queue_deliveries(ledger, new_jobs, seen, cfg, now)
+
+    def checkpoint():
+        save_json(ledger_path, ledger)
+
     checkpoint()  # persist intent before any external side effect
     save_json(SEEN_PATH, sorted(seen))
     msg_map = load_json(MSG_MAP_PATH, {})
@@ -581,52 +581,14 @@ def main(argv=None):
     except Exception as exc:
         sync_error = type(exc).__name__
         print(f"[error] Sync failed: {sync_error}; checkpointed work will retry.")
-    for key, source in current_sources.items():
-        if source.get("ok"):
-            source.pop("failing_since", None)
-            if old_sources.get(key, {}).get("issue"):
-                close_source_issue(old_sources[key]["issue"])
-        else:
-            source["failing_since"] = (source.get("failing_since")
-                                       or old_sources.get(key, {}).get("failing_since") or now)
-            if old_sources.get(key, {}).get("issue"):
-                source["issue"] = old_sources[key]["issue"]
-    # A board removed from config (or moved to a new slug) is no longer fetched.
-    for key, source in old_sources.items():
-        if key not in current_sources and source.get("issue"):
-            close_source_issue(source["issue"], "Source no longer watched; closing.")
-    failures = sum(not v.get("ok") for v in current_sources.values())
-    stale = sorted(k for k, v in current_sources.items()
-                   if not v.get("ok") and now - v["failing_since"] >= SOURCE_ALERT_AFTER)
-    opened = []
-    for key in stale:
-        source = current_sources[key]
-        if not source.get("issue") and (number := open_source_issue(key, source, cfg, now)):
-            source["issue"] = number
-            opened.append(number)
-    if opened and os.environ.get("GITHUB_OUTPUT"):
-        with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
-            stream.write(f"source_issues={' '.join(map(str, opened))}\n")
-    health = {"last_completed_scan": now, "sources": current_sources,
-              "successful_sources": len(current_sources) - failures, "failed_sources": failures,
-              "stale_failed_sources": len(stale),
-              "matching_jobs": len(all_jobs), "new_jobs": len(new_jobs),
-              "pending_deliveries": sum(len(v["destinations"]) for v in ledger["pending"].values()),
-              "sync_error": sync_error}
-    save_json(health_path, health)
-    summary = (f"Sources: {health['successful_sources']} OK, {failures} failed "
-               f"({len(stale)} down {SOURCE_ALERT_AFTER // 3600}h+); "
-               f"pending deliveries: {health['pending_deliveries']}; sync: {sync_error or 'OK'}")
-    for key, source in sorted(current_sources.items()):
-        if not source.get("ok"):
-            hours = (now - source["failing_since"]) / 3600
-            summary += f"\n- {key}: {source.get('error')} for {hours:.1f}h"
-    print(summary)
-    if os.environ.get("GITHUB_STEP_SUMMARY"):
-        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as stream:
-            stream.write(summary + "\n")
-    # Individual dead sources are tracked as issues; only a broad outage fails the run.
-    return int(bool(len(stale) > MAX_STALE_SOURCES or sync_error or health["pending_deliveries"]))
+    health = build_health(
+        current_sources, previous_sources, now=now,
+        matching_jobs=len(all_jobs), new_jobs=len(new_jobs),
+        pending_deliveries=sum(len(entry["destinations"]) for entry in ledger["pending"].values()),
+        sync_error=sync_error,
+    )
+    track_source_issues(health, previous_sources, cfg)
+    return report_health(health)
 
 
 if __name__ == "__main__":

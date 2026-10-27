@@ -6,7 +6,7 @@ This repository monitors internship postings and routes matching jobs to Discord
 
 Each watcher run:
 
-1. Fetches the 173 company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs and Jobright feeds.
+1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs and Jobright feeds.
 2. Applies the title, location, and season filters to every source. The top-level `terms` list applies to all sources; `simplify.terms` remains a backward-compatible fallback only when top-level `terms` is absent. `keep_unknown_terms` controls whether a posting with no recognizable season term is retained and defaults to keeping unknown terms.
 3. Identifies postings by ATS identity or canonical URL. Known campaign parameters are removed, while other URL query parameters are preserved because they may identify the job. Exact identities remain known indefinitely. Cross-source fuzzy fingerprints are retained for `dedup_days` (30 days by default). Legacy `norm:` entries in state are ignored for matching and are not removed.
 4. Places each new job into `delivery_state.json` with its individual destinations. Discord notifications are individual posts and retain the 📌 instruction. There are no digest messages. `max_discord_per_run` defaults to 50; undelivered destinations remain queued for a later run.
@@ -15,6 +15,19 @@ Each watcher run:
 The watcher checkpoints intent before external delivery and uses atomic JSON writes. A request timeout can still mean that Discord accepted a message before the response was lost, so a retry can duplicate a Discord post. Querying existing Notion rows by job identity reduces duplicate tracker rows, but delivery is not exactly once.
 
 The repository also contains the `internship-pinger` Cloudflare Worker. It triggers the `watch.yml` workflow and monitors completed main-branch runs, sending hourly stale or failure warnings. See [`internship-pinger/README.md`](internship-pinger/README.md) for its setup.
+
+The Python modules have separate responsibilities:
+
+| Module | Responsibility |
+| --- | --- |
+| `watcher.py` | Discover, filter, deduplicate, checkpoint, and deliver postings |
+| `job_feeds.py` | Shared board endpoints and feed validation |
+| `project_config.py` | Validate configuration, import personal webhook settings, and resolve defaults |
+| `source_health.py` | Calculate scan health, format summaries, and choose the run's exit status |
+| `notion_sync.py` | Master log, durable pin/applied queues, posting liveness, and tracker statistics |
+| `job_utils.py` | Job identities, preferences, and atomic JSON storage |
+
+Notion sync queues observed pins and application links before processing them. Collection and delivery are separate steps so a failed write can retry even after the original message is gone. A recovered request does not count as a sync failure; ambiguous page/database creates still require a fresh lookup before retrying.
 
 ## Notion and Discord workflow
 
@@ -66,7 +79,9 @@ With no delivery credentials, or with `python watcher.py --dry-run`, the watcher
 
 ## Configuration
 
-`config.json` contains the 173 `companies` entries plus explicit defaults for `terms`, `keep_unknown_terms`, `dedup_days` (30), `max_discord_per_run` (50), `follow_up_days` (14), and `profiles` (an empty object unless configured). It also contains the SimplifyJobs and Jobright feed settings. Add a board only after verifying its slug with `verify_boards.py`; unsupported or stale slugs can return 404. The configured `exclude_locations` list uses word-boundary matching and keeps locations that clearly contain a US state or USA. Empty or unknown locations are retained.
+`config.json` contains the `companies` entries plus explicit defaults for `terms`, `keep_unknown_terms`, `dedup_days` (30), `max_discord_per_run` (50), `follow_up_days` (14), and `profiles` (an empty object unless configured). It also contains the SimplifyJobs and Jobright feed settings. Add a board only after verifying its slug with `verify_boards.py`; unsupported or stale slugs can return 404. The configured `exclude_locations` list uses word-boundary matching and keeps locations that clearly contain a US state or USA. Empty or unknown locations are retained.
+
+Wayve is fetched directly from its Ashby board. Postman moved to Workday, which the watcher does not fetch directly; it is included in the SimplifyJobs company filter and remains eligible for Jobright routing. Postman alerts depend on those feeds publishing matching jobs within the configured age window.
 
 For profiles, use Discord user IDs as keys, for example:
 
@@ -111,7 +126,19 @@ python watcher.py --dry-run
 python watcher.py
 ```
 
+Check the boards in the actual configuration, a selected company, or a new candidate:
+
+```bash
+python verify_boards.py
+python verify_boards.py --company Wayve
+python verify_boards.py --candidate ashby wayve
+```
+
+The verifier uses the same endpoints and feed-shape checks as the watcher, reports HTTP/schema errors, and exits nonzero if any board fails. It does not change runtime state or send notifications. Feed options and personal preferences are validated before a watcher scan begins.
+
 Run the tests with `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. The workflow always uploads the five state files as a recovery artifact with seven-day retention. Its persistence step always runs, makes up to three rebase/push attempts, and preserves the artifact if a rebase conflict prevents pushing. Do not assume the scheduled workflow runs exactly every ten minutes.
+
+See [IMPROVEMENTS.md](IMPROVEMENTS.md) for prioritized maintenance suggestions and their tradeoffs.
 
 ## Troubleshooting
 
