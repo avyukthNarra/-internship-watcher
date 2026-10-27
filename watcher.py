@@ -25,7 +25,7 @@ from pathlib import Path
 
 import requests
 
-from job_utils import (load_json, save_json, canonical_url, job_identity,
+from job_utils import (load_json, save_json, canonical_url, job_identity, clean_job,
                        fingerprint, term_matches, preference_matches)
 from job_feeds import board_url, feed_items
 from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT,
@@ -281,7 +281,10 @@ def notify_discord(webhook_url, jobs):
     """Individual messages in every batch; caller checkpoints each success."""
     posted, failed = [], set()
     for j in jobs:
-        content = (f"**{j['company']}** — [{j['title']}]({j['url']})"
+        # Brackets/parens/spaces in untrusted text would break or rewrite the link.
+        title = j["title"].replace("[", "(").replace("]", ")")
+        link = j["url"].replace(")", "%29").replace("(", "%28").replace(" ", "%20")
+        content = (f"**{j['company']}** — [{title}]({link})"
                    + (f" · {j['location']}" if j.get("location") else "")
                    + "\n-# 📌 react to add this to your Notion tracker")
         # Avoid invalid payloads from unusually long feed fields.
@@ -362,6 +365,7 @@ def discover(cfg):
             except (KeyError, TypeError, ValueError, AttributeError) as exc:
                 SOURCE_HEALTH[name] = {"ok": False, "error": type(exc).__name__}
     terms = cfg.get("terms", cfg.get("simplify", {}).get("terms", []))
+    jobs = [clean_job(j) for j in jobs]
     return [j for j in jobs if matches(j["title"], include, exclude)
             and not location_excluded(j.get("location", ""), cfg.get("exclude_locations", []))
             and term_matches(j, terms, cfg.get("keep_unknown_terms", True))]

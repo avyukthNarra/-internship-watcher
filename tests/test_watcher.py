@@ -23,6 +23,23 @@ def page(j, status='Saved', pid='page-1'):
         'Role': {'title': [{'plain_text': j['title']}]}}}
 
 
+class CleanJobTests(unittest.TestCase):
+    def test_normalizes_nulls_controls_and_schemes(self):
+        from job_utils import clean_job
+        cleaned = clean_job({'id': 'a', 'company': None, 'title': 'SWE\nIntern\x00', 'location': None,
+                             'url': 'ftp://x.example/1', 'terms': ['Summer 2027']})
+        self.assertEqual((cleaned['company'], cleaned['title'], cleaned['location'], cleaned['url']),
+                         ('', 'SWE Intern', '', ''))
+        self.assertEqual(cleaned['terms'], ['Summer 2027'])
+        self.assertEqual(clean_job({'id': 'b', 'title': ' '})['title'], 'Untitled')
+
+    def test_valid_job_identity_is_unchanged(self):
+        from job_utils import clean_job
+        j = job()
+        self.assertEqual(job_identity(clean_job(j)), job_identity(j))
+        self.assertEqual(fingerprint(clean_job(j)), fingerprint(j))
+
+
 class KeywordTests(unittest.TestCase):
     INCLUDE = ["intern", "internship", "co-op", "coop"]
     EXCLUDE = ["internal", "sales", "marketing", "mba", " mba", "mba ", "ph.d", "hr intern"]
@@ -147,6 +164,27 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(records[0]['mid'], 'm')
         post.side_effect = requests.Timeout()
         self.assertEqual(watcher.notify_discord('https://example.invalid/hook', [job()])[1], {job()['id']})
+
+    @patch('watcher.time.sleep')
+    @patch('watcher.requests.post')
+    def test_untrusted_text_cannot_rewrite_discord_link(self, post, sleep):
+        post.return_value = Mock(status_code=200, json=lambda: {'id': 'm', 'channel_id': 'c'})
+        hostile = {**job(), 'title': 'Intern](https://evil.example) [x', 'url': 'https://a.example/p(1) 2'}
+        watcher.notify_discord('https://example.invalid/hook', [hostile])
+        content = post.call_args.kwargs['json']['content']
+        self.assertIn('[Intern)(https://evil.example) (x](https://a.example/p%281%29%202)', content)
+        self.assertEqual(content.count('](http'), 1)
+
+    def test_null_feed_fields_do_not_crash_discovery(self):
+        board = [{'id': 'lever:x:1', 'title': None, 'location': None, 'url': 'javascript:alert(1)'},
+                 {'id': 'lever:x:2', 'title': 'SWE Intern', 'location': None, 'url': 'https://x.example/2'}]
+        cfg = {'companies': [{'name': 'X', 'ats': 'lever', 'board': 'x'}], 'include_keywords': ['intern'],
+               'simplify': {'enabled': False}}
+        with patch.dict(watcher.ATS_FETCHERS, {'lever': lambda board_name: board}):
+            found = watcher.discover(cfg)
+        self.assertEqual([j['id'] for j in found], ['lever:x:2'])
+        self.assertEqual(found[0]['location'], '')
+        fingerprint(found[0])  # previously AttributeError on a null location
 
     def test_dry_run_unchanged_even_with_credentials(self):
         before = {p.name: p.read_bytes() for p in self.root.iterdir()}

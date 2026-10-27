@@ -31,6 +31,26 @@ def save_json(path, data):
             os.unlink(temp)
 
 
+_CONTROL_CHARS = re.compile(r'[\x00-\x1f\x7f]+')
+
+
+def clean_text(value):
+    """A feed field as a single-line string; null and control characters become blank."""
+    return '' if value is None else _CONTROL_CHARS.sub(' ', str(value)).strip()
+
+
+def clean_job(job):
+    """Normalize untrusted feed fields so one odd posting cannot crash a run
+    or produce an invalid Discord/Notion payload. Non-http(s) URLs are blanked."""
+    cleaned = dict(job)
+    for field in ('company', 'title', 'location', 'url'):
+        cleaned[field] = clean_text(job.get(field))
+    if urlsplit(cleaned['url']).scheme.lower() not in ('http', 'https'):
+        cleaned['url'] = ''
+    cleaned['title'] = cleaned['title'] or 'Untitled'
+    return cleaned
+
+
 def canonical_url(url):
     """Remove known campaign tags, preserving job IDs and SPA fragments."""
     p = urlsplit(url or '')
