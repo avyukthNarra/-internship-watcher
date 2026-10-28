@@ -134,6 +134,33 @@ class CategoryTests(unittest.TestCase):
         self.assertTrue(found["simplify:2"]["via_category"])
         self.assertEqual(found["simplify:2"]["category"], "Hardware")
 
+    def test_category_roles_filter_only_category_pulls(self):
+        data = [self.listing("1", "Google", "Hardware"), self.listing("2", "Rockwell", "Hardware"),
+                self.listing("3", "Rockwell", "Hardware"), self.listing("4", "Jump", "Quant")]
+        data[0]["title"] = "Mechanical Test Intern"      # tracked company: category roles do not apply
+        data[1]["title"] = "FPGA Design Intern"
+        data[2]["title"] = "Optical Engineer Intern"
+        cfg = {"simplify": {"enabled": True, "company_keywords": ["google"],
+                            "include_categories": ["Hardware", "Quant"],
+                            "category_roles": {"Hardware": ["fpga", "embedded", "firmware"]}}}
+        with patch.object(watcher, "source_items", return_value=data):
+            ids = {j["id"] for j in watcher.fetch_simplify(cfg)}
+        self.assertEqual(ids, {"simplify:1", "simplify:2", "simplify:4"})
+
+    def test_category_exclude_drops_unwanted_category_pulls_only(self):
+        data = [self.listing("1", "Google", "Hardware"), self.listing("2", "Rockwell", "Hardware"),
+                self.listing("3", "Rockwell", "Hardware"), self.listing("4", "Rockwell", "Quant")]
+        data[0]["title"] = "Materials Intern"            # tracked company: not filtered
+        data[1]["title"] = "Optical Engineer Intern"     # fits a computer engineer: kept
+        data[2]["title"] = "Materials Process Engineer Intern"
+        data[3]["title"] = "Materials Quant Intern"      # exclusion is per category
+        cfg = {"simplify": {"enabled": True, "company_keywords": ["google"],
+                            "include_categories": ["Hardware", "Quant"],
+                            "category_exclude": {"Hardware": ["materials", "process engineer"]}}}
+        with patch.object(watcher, "source_items", return_value=data):
+            ids = {j["id"] for j in watcher.fetch_simplify(cfg)}
+        self.assertEqual(ids, {"simplify:1", "simplify:2", "simplify:4"})
+
     def test_category_jobs_skip_top_channel_and_feed_category_channels(self):
         cfg = {"companies": [], "simplify": {"company_keywords": ["google"]},
                "alert_channels": [{"name": "hw", "webhook_env": "DISCORD_WEBHOOK_HW",
@@ -154,6 +181,11 @@ class CategoryTests(unittest.TestCase):
         validate_config({"companies": [], "simplify": {"include_categories": ["Hardware"]}})
         with self.assertRaises(ValueError):
             validate_config({"companies": [], "simplify": {"include_categories": "Hardware"}})
+        validate_config({"companies": [], "simplify": {"category_roles": {"Hardware": ["fpga"]}}})
+        for option in ("category_roles", "category_exclude"):
+            for bad in ({"Hardware": "fpga"}, ["fpga"], {"Hardware": [1]}):
+                with self.assertRaises(ValueError):
+                    validate_config({"companies": [], "simplify": {option: bad}})
 
 
 class AlertChannelTests(unittest.TestCase):

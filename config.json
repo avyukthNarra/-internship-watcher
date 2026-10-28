@@ -6,6 +6,12 @@
     "coop"
   ],
   "exclude_keywords": [
+    "chemical",
+    "chemistry",
+    "structural",
+    "geotechnical",
+    "hvac",
+    "welding",
     "unpaid",
     "internal",
     "mechanical",
@@ -1088,6 +1094,21 @@
       "Hardware",
       "Quant"
     ],
+    "category_exclude": {
+      "Hardware": [
+        "materials",
+        "metallurgy",
+        "metallurgical",
+        "process engineer",
+        "facilities",
+        "environmental",
+        "safety",
+        "machinist",
+        "technician",
+        "electrician",
+        "construction"
+      ]
+    },
     "terms": [
       "Fall 2026",
       "Winter 2027",

@@ -237,6 +237,10 @@ def fetch_simplify(cfg):
         SOURCE_HEALTH[url] = {**SOURCE_HEALTH[url], "filter_digest": digest, "full_fetch": time.time()}
     company_filter = [c.lower() for c in sim.get("company_keywords", [])]
     categories = {c.lower() for c in sim.get("include_categories", [])}
+    category_roles = {name.lower(): _keyword_regex(tuple(words))
+                      for name, words in sim.get("category_roles", {}).items() if words}
+    category_exclude = {name.lower(): _keyword_regex(tuple(words))
+                        for name, words in sim.get("category_exclude", {}).items() if words}
     min_age_days = sim.get("max_age_days", 14)
     cutoff = time.time() - min_age_days * 86400
 
@@ -251,6 +255,12 @@ def fetch_simplify(cfg):
         by_company = not company_filter or company_matches(company, company_filter)
         by_category = category.lower() in categories
         if not (by_company or by_category):
+            continue
+        roles = category_roles.get(category.lower())
+        if not by_company and roles and not roles.search(j.get("title", "").lower()):
+            continue  # pulled for its category, but the role is not one you want
+        blocked = category_exclude.get(category.lower())
+        if not by_company and blocked and blocked.search(j.get("title", "").lower()):
             continue
         job = {
             "id": f"simplify:{j.get('id')}",

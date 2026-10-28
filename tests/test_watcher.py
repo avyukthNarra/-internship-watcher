@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 import requests
 import watcher
 import notion_sync as notion
-from job_utils import canonical_url, job_identity, fingerprint, term_matches, preference_matches, load_json
+from job_utils import canonical_url, job_identity, job_terms, fingerprint, term_matches, preference_matches, load_json
 
 
 def job(jid='greenhouse:example:123', **kwargs):
@@ -21,6 +21,17 @@ def page(j, status='Saved', pid='page-1'):
     return {'id': pid, 'properties': {
         'Link': {'url': j['url']}, 'Status': {'select': {'name': status}},
         'Role': {'title': [{'plain_text': j['title']}]}}}
+
+
+class UnknownSeasonTests(unittest.TestCase):
+    def test_na_is_an_unknown_season_not_a_mismatch(self):
+        j = {'title': 'Firmware Intern', 'terms': ['N/A']}
+        self.assertEqual(job_terms(j), [])
+        self.assertTrue(term_matches(j, ['Summer 2027']))
+        self.assertFalse(term_matches(j, ['Summer 2027'], keep_unknown=False))
+        self.assertFalse(term_matches({**j, 'terms': ['Summer 2026']}, ['Summer 2027']))
+        self.assertFalse(term_matches({**j, 'title': 'Firmware Intern 2026'}, ['Summer 2027']))
+        self.assertTrue(term_matches({**j, 'terms': ['N/A', 'Summer 2027']}, ['Summer 2027']))
 
 
 class CleanJobTests(unittest.TestCase):

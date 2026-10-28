@@ -100,6 +100,10 @@ Wayve is fetched directly from its Ashby board. Postman moved to Workday, which 
 }
 ```
 
+`simplify.category_exclude` (a map of category to keywords) drops category-only pulls whose title contains an unwanted word, for example `"Hardware": ["materials", "technician"]`, and `simplify.category_roles` does the reverse, keeping only titles that contain one of the listed words. Both apply only to postings pulled because of their category, never to companies you track, and are matched as whole words.
+
+A SimplifyJobs term of `N/A` (and `TBD`, `unknown`, `none`) is treated as an unknown season, so `keep_unknown_terms` decides whether those postings are kept. Previously `N/A` was mistaken for a season that never matched, which silently hid those postings.
+
 Channels (and profiles) can also match on `categories`, the SimplifyJobs category of a posting (for example `Hardware`, `Quant`, `Software`, `AI/ML/Data`, `Product`). Only SimplifyJobs postings carry a category.
 
 `simplify.include_categories` pulls every SimplifyJobs posting in those categories regardless of company, still subject to the title, location, and season filters. Such postings go to the general channel and any matching alert channel, but not the TOP channel unless the company is one you track. The shipped config pulls `Hardware` and `Quant` and defines `hardware` and `quant` alert channels; those channels stay inactive until you add `DISCORD_WEBHOOK_HARDWARE` and `DISCORD_WEBHOOK_QUANT` to `PERSONAL_WEBHOOKS_JSON`.

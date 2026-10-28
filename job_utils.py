@@ -80,8 +80,11 @@ def job_identity(job):
     return 'url:' + url if url else 'id:' + job['id']
 
 
+UNKNOWN_TERMS = {'', 'n/a', 'na', 'none', 'unknown', 'tbd'}
+
+
 def job_terms(job):
-    explicit = job.get('terms') or []
+    explicit = [t for t in (job.get('terms') or []) if str(t).strip().lower() not in UNKNOWN_TERMS]
     inferred = re.findall(r'\b(Fall|Winter|Spring|Summer|Autumn)\s*[-/]?\s*(20\d{2})\b',
                           job.get('title', ''), re.I)
     return sorted({s.lower().replace('autumn', 'fall') for s in explicit}

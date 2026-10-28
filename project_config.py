@@ -52,6 +52,12 @@ def validate_config(cfg):
         if not isinstance(feed, dict):
             raise ValueError(name + " must be an object")
         _string_lists(feed, list_keys, name + ".")
+        for option in ("category_roles", "category_exclude"):
+            if option in feed:
+                if not isinstance(feed[option], dict):
+                    raise ValueError(f"{name}.{option} must map category names to keyword lists")
+                for category, words in feed[option].items():
+                    _string_lists({category: words}, (category,), f"{name}.{option}.")
         _non_negative_integers(feed, ("max_age_days",), name + ".")
         _booleans(feed, ("enabled",), name + ".")
         if "url" in feed and not isinstance(feed["url"], str):
