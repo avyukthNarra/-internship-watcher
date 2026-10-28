@@ -45,6 +45,9 @@ Ground rules for every change: keep the tests green (`python3 -m unittest discov
 
 ## Phase 5 — More coverage (only as needed)
 
+- [x] vanshb03 feed added (3-day window, Simplify-style terms so the fingerprint dedupe works). 2026-10-27.
+- [x] `discover_boards.py --industry` run on YC robotics/hardware/aerospace; Spaceium, Brumby, One Robot added.
+- [x] Role channels (`swe`, `data`, `research`, `ml`, `embedded`, `hardware`, `quant`) with `exclude_roles`; shared watchlist channel documented. Webhooks still to be created.
 - [ ] **J5:** list tracked companies that have no direct board and decide which are worth an adapter.
 - [ ] Workday adapter (pagination, stable IDs, source-failure handling), then SmartRecruiters/Workable as needed. Follow `03-scraper-guide.md`.
 - [ ] **J3:** optional global `role_keywords` filter for the shared channels.

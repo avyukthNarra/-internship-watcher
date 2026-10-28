@@ -113,13 +113,18 @@ def fingerprint(job):
 
 def preference_matches(job, preferences):
     """All configured dimensions must match; empty lists impose no restriction.
-    `categories` matches the SimplifyJobs category (for example Hardware, Quant)."""
+    `categories` matches the SimplifyJobs category (for example Hardware, Quant);
+    `exclude_roles` rejects titles containing any listed word."""
     for key, field in (('roles', 'title'), ('companies', 'company'),
                        ('locations', 'location')):
         wanted = preferences.get(key, [])
         if wanted and not any(re.search(r'\b' + re.escape(s.lower()) + r'\b',
                                          job.get(field, '').lower()) for s in wanted):
             return False
+    blocked = preferences.get('exclude_roles', [])
+    if any(re.search(r'\b' + re.escape(s.lower()) + r'\b', job.get('title', '').lower())
+           for s in blocked):
+        return False
     categories = {c.lower() for c in preferences.get('categories', [])}
     if categories and (job.get('category') or '').lower() not in categories:
         return False

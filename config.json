@@ -1232,10 +1232,136 @@
   "follow_up_days": 14,
   "alert_channels": [
     {
+      "name": "swe",
+      "webhook_env": "DISCORD_WEBHOOK_SWE",
+      "roles": [
+        "software",
+        "swe",
+        "backend",
+        "frontend",
+        "full stack",
+        "fullstack",
+        "web",
+        "mobile",
+        "devops",
+        "platform",
+        "infrastructure"
+      ],
+      "exclude_roles": [
+        "embedded",
+        "firmware",
+        "fpga",
+        "rtl",
+        "asic",
+        "microcontroller",
+        "rtos",
+        "device driver",
+        "bare metal",
+        "linux kernel"
+      ]
+    },
+    {
+      "name": "data",
+      "webhook_env": "DISCORD_WEBHOOK_DATA",
+      "roles": [
+        "data",
+        "analytics",
+        "analyst",
+        "business intelligence"
+      ]
+    },
+    {
+      "name": "research",
+      "webhook_env": "DISCORD_WEBHOOK_RESEARCH",
+      "roles": [
+        "research",
+        "scientist"
+      ]
+    },
+    {
+      "name": "ml",
+      "webhook_env": "DISCORD_WEBHOOK_ML",
+      "roles": [
+        "machine learning",
+        "ml",
+        "ai",
+        "deep learning",
+        "computer vision",
+        "nlp",
+        "llm",
+        "artificial intelligence",
+        "generative"
+      ]
+    },
+    {
+      "name": "embedded",
+      "webhook_env": "DISCORD_WEBHOOK_EMBEDDED",
+      "roles": [
+        "embedded",
+        "firmware",
+        "fpga",
+        "rtl",
+        "asic",
+        "microcontroller",
+        "rtos",
+        "device driver",
+        "bare metal",
+        "linux kernel"
+      ]
+    },
+    {
       "name": "hardware",
       "webhook_env": "DISCORD_WEBHOOK_HARDWARE",
       "categories": [
         "Hardware"
+      ],
+      "exclude_roles": [
+        "embedded",
+        "firmware",
+        "fpga",
+        "rtl",
+        "asic",
+        "microcontroller",
+        "rtos",
+        "device driver",
+        "bare metal",
+        "linux kernel"
+      ]
+    },
+    {
+      "name": "hardware-by-title",
+      "webhook_env": "DISCORD_WEBHOOK_HARDWARE",
+      "roles": [
+        "hardware",
+        "electrical",
+        "electronics",
+        "circuit",
+        "pcb",
+        "analog",
+        "digital design",
+        "verification",
+        "validation",
+        "silicon",
+        "semiconductor",
+        "optical",
+        "photonics",
+        "thermal",
+        "rf",
+        "power electronics",
+        "test engineer",
+        "manufacturing"
+      ],
+      "exclude_roles": [
+        "embedded",
+        "firmware",
+        "fpga",
+        "rtl",
+        "asic",
+        "microcontroller",
+        "rtos",
+        "device driver",
+        "bare metal",
+        "linux kernel"
       ]
     },
     {
@@ -1243,6 +1369,17 @@
       "webhook_env": "DISCORD_WEBHOOK_QUANT",
       "categories": [
         "Quant"
+      ]
+    },
+    {
+      "name": "quant-by-title",
+      "webhook_env": "DISCORD_WEBHOOK_QUANT",
+      "roles": [
+        "quant",
+        "quantitative",
+        "trading",
+        "trader",
+        "market making"
       ]
     }
   ],

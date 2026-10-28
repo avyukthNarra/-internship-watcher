@@ -273,6 +273,51 @@ class AlertChannelTests(unittest.TestCase):
         self.assertTrue(notifications_enabled(self.CFG, {"DISCORD_WEBHOOK_QUANT": "q"}))
 
 
+class RoleChannelTests(unittest.TestCase):
+    CFG = {"companies": [], "alert_channels": [
+        {"name": "embedded", "webhook_env": "DISCORD_WEBHOOK_EMBEDDED", "roles": ["embedded", "firmware"]},
+        {"name": "swe", "webhook_env": "DISCORD_WEBHOOK_SWE", "roles": ["software"],
+         "exclude_roles": ["embedded", "firmware"]},
+        {"name": "hw", "webhook_env": "DISCORD_WEBHOOK_HW", "categories": ["Hardware"],
+         "exclude_roles": ["embedded", "firmware"]},
+        {"name": "hw-title", "webhook_env": "DISCORD_WEBHOOK_HW", "roles": ["optical"],
+         "exclude_roles": ["embedded", "firmware"]},
+        {"name": "watchlist", "webhook_env": "DISCORD_WEBHOOK_WATCH", "companies": ["Nvidia", "Jane Street"]}]}
+    ENV = {name: "x" for name in ("DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_EMBEDDED", "DISCORD_WEBHOOK_SWE",
+                                  "DISCORD_WEBHOOK_HW", "DISCORD_WEBHOOK_WATCH")}
+
+    def route(self, title, **kw):
+        job = {"id": "ashby:a:1", "company": "Acme", "title": title, "location": "", "url": "u", **kw}
+        with patch.dict(os.environ, self.ENV, clear=True):
+            return [d.split("_")[-1] for d in watcher.destinations(job, self.CFG)
+                    if d != "discord:DISCORD_WEBHOOK_URL"]
+
+    def test_embedded_and_other_hardware_and_software_are_split(self):
+        self.assertEqual(self.route("Embedded Software Intern"), ["EMBEDDED"])
+        self.assertEqual(self.route("Firmware Intern", category="Hardware"), ["EMBEDDED"])
+        self.assertEqual(self.route("Analog Intern", category="Hardware"), ["HW"])
+        self.assertEqual(self.route("Optical Engineer Intern"), ["HW"])
+        self.assertEqual(self.route("Software Engineer Intern"), ["SWE"])
+
+    def test_two_entries_for_one_webhook_post_once(self):
+        self.assertEqual(self.route("Optical Intern", category="Hardware"), ["HW"])
+
+    def test_watchlist_matches_companies_and_other_channels_still_apply(self):
+        self.assertEqual(self.route("Marketing Intern", company="NVIDIA Corp"), ["WATCH"])  # whole word, any case
+        self.assertEqual(self.route("Marketing Intern", company="Nvidiax Labs"), [])
+        self.assertEqual(self.route("Sales Intern", company="Jane Street"), ["WATCH"])
+        self.assertEqual(self.route("Software Intern", company="Nvidia"), ["SWE", "WATCH"])
+
+    def test_a_channel_with_no_filter_is_rejected(self):
+        from project_config import validate_config
+        with self.assertRaises(ValueError):
+            validate_config({"companies": [], "alert_channels": [
+                {"name": "all", "webhook_env": "DISCORD_WEBHOOK_ALL", "companies": []}]})
+        with self.assertRaises(ValueError):
+            validate_config({"companies": [], "alert_channels": [
+                {"name": "x", "webhook_env": "DISCORD_WEBHOOK_X", "roles": ["a"], "exclude_roles": "b"}]})
+
+
 class SimplifyCacheTests(unittest.TestCase):
     URL = "https://feed.example/listings.json"
     CFG = {"simplify": {"enabled": True, "url": URL, "max_age_days": 7}, "terms": ["Summer 2027"]}

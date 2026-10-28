@@ -70,7 +70,8 @@ def validate_config(cfg):
     for profile in profiles.values():
         if not isinstance(profile, dict):
             raise ValueError("Each profile must be an object")
-        _string_lists(profile, ("roles", "companies", "locations", "terms", "categories"), "Profile ")
+        _string_lists(profile, ("roles", "exclude_roles", "companies", "locations", "terms", "categories"),
+                      "Profile ")
         _non_negative_integers(profile, ("follow_up_days",), "Profile ")
         _booleans(profile, ("keep_unknown_terms",), "Profile ")
         if "webhook_env" in profile and (not isinstance(profile["webhook_env"], str)
@@ -90,8 +91,12 @@ def _validate_alert_channels(channels):
         if not isinstance(channel.get("webhook_env"), str) \
                 or not channel["webhook_env"].startswith("DISCORD_WEBHOOK_"):
             raise ValueError("Alert channel webhook_env must begin DISCORD_WEBHOOK_")
-        _string_lists(channel, ("roles", "companies", "locations", "terms", "categories"),
-                      "Alert channel ")
+        _string_lists(channel, ("roles", "exclude_roles", "companies", "locations", "terms",
+                                "categories"), "Alert channel ")
+        if not any(channel.get(key) for key in ("roles", "companies", "locations", "terms",
+                                                "categories")):
+            raise ValueError(f"Alert channel {channel['name']} needs roles, companies, locations, "
+                             "terms, or categories; with none it would repeat every job")
         _booleans(channel, ("keep_unknown_terms",), "Alert channel ")
 
 

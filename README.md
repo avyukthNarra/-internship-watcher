@@ -87,7 +87,17 @@ Wayve is fetched directly from its Ashby board. Postman moved to Workday, which 
 
 ### Alert channels
 
-`alert_channels` (optional list) posts matching jobs into extra Discord channels, in addition to the normal channel. Each entry has a `name`, a `webhook_env`, and any of `roles`, `companies`, `locations`, `terms`, `keep_unknown_terms`; empty or missing lists impose no restriction. People opt in by turning on notifications for the channels they care about, so no per-person setup is needed.
+The shipped config has role channels (`swe`, `data`, `research`, `ml`, `embedded`, `hardware`, `quant`). Embedded and firmware titles go to `embedded` only; other hardware goes to `hardware`; `swe` skips embedded titles. A title that fits two roles (for example "Machine Learning Software Intern") posts in both. They stay inactive until `DISCORD_WEBHOOK_SWE`, `_DATA`, `_RESEARCH`, `_ML`, `_EMBEDDED`, `_HARDWARE`, and `_QUANT` are added to `PERSONAL_WEBHOOKS_JSON`.
+
+To get pings for specific companies, add a shared watchlist entry and have people follow that Discord channel:
+
+```json
+{"name": "watchlist", "webhook_env": "DISCORD_WEBHOOK_WATCHLIST", "companies": ["Nvidia", "Jane Street"]}
+```
+
+Company names match as whole words in any case, so `Nvidia` also matches "NVIDIA Corp". Add or remove names in `config.json`; matching jobs post as they drop.
+
+`alert_channels` (optional list) posts matching jobs into extra Discord channels, in addition to the normal channel. Each entry has a `name`, a `webhook_env`, and any of `roles`, `exclude_roles`, `companies`, `locations`, `terms`, `categories`, `keep_unknown_terms`; empty or missing lists impose no restriction, but an entry must set at least one of `roles`, `companies`, `locations`, `terms`, `categories` (otherwise it would repeat every job). `exclude_roles` rejects titles containing any listed word. Several entries may share one `webhook_env`; a job that matches more than one still posts there once. People opt in by turning on notifications for the channels they care about, so no per-person setup is needed.
 
 ```json
 {
