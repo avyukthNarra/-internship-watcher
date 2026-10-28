@@ -28,7 +28,7 @@ Status on 2026-10-27: 17 commits ahead of `main`, 27 files changed, 117 Python t
 - **Exit policy:** `source_health.health_exit_code` now fails a run only for a broad outage (10% or more of sources down), stuck deliveries, or a sync error. One stale board warns and no longer fails every run or triggers pinger alerts. This came from `oldmissioncapital`, which returned 404 for about 150 hours and failed every run.
 - **ETag cache for the SimplifyJobs feed** (13 MB, previously downloaded every run). Off in dry runs; a full fetch is forced every hour and whenever filter settings change. The cache is in `health.json` source records.
 - **`trim_health_noise.py` (new):** the workflow runs it before committing state. If no state file changed and only volatile `health.json` fields changed (timestamps, counts, ETag bookkeeping), it restores `health.json` from git. In the last 300 bot commits it would have skipped 152. This line in `watch.yml` takes effect only after merge.
-- **Skipped on purpose, with measurements** (see `me_in/02-optimizations.md`): state pruning (`seen.json` grows about 100 IDs a day, and pruning risks re-alerts), fewer Notion calls (cannot be verified without a token), connection reuse (timings were noise).
+- **Skipped on purpose, with measurements** (see `sai_docs/02-optimizations.md`): state pruning (`seen.json` grows about 100 IDs a day, and pruning risks re-alerts), fewer Notion calls (cannot be verified without a token), connection reuse (timings were noise).
 
 ### Filtering correctness
 - **Whole-word keyword matching** (optional plural `s`): "intern" no longer matches "International" or "Internet". This dropped 83 non-internships from the matching set. Note "Marketing Technology Engineer Intern" is still excluded by "marketing".
@@ -108,4 +108,4 @@ Being listed in `CODEOWNERS` does not grant any of these. Settings changes need 
 
 ## Where the detail lives
 
-`me_in/00-CONTEXT.md` (system overview), `01-security-audit.md` (all S findings), `02-optimizations.md` (measurements), `03-scraper-guide.md` (how to extend), `04-todo.md` (checklist).
+`sai_docs/00-CONTEXT.md` (system overview), `01-security-audit.md` (all S findings), `02-optimizations.md` (measurements), `03-scraper-guide.md` (how to extend), `04-todo.md` (checklist).

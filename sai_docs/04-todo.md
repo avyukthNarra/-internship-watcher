@@ -6,7 +6,7 @@ Ground rules for every change: keep the tests green (`python3 -m unittest discov
 
 ## Phase 0 — Today, no code
 
-- [ ] Commit `me_in/` on your branch and push, then open a PR into `main`.
+- [ ] Commit `sai_docs/` on your branch and push, then open a PR into `main`.
 - [ ] **S1:** create a GitHub Environment limited to `main`, move the secrets into it, add `environment:` to `watch.yml`. (This needs the repo owner, `avyukthNarra`.)
 - [ ] **S9:** confirm the pinger's `GH_PAT` is a fine-grained, single-repo, Actions-only token with an expiry.
 - [ ] Run `gitleaks detect` on the full history to back up the pattern scan in the audit.
