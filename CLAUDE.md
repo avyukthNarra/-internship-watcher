@@ -2,7 +2,7 @@
 
 ## What this is
 
-An internship alert and application-tracking system. The main watcher reads configured company boards plus SimplifyJobs and Jobright feeds, filters every source, and routes individual postings to Discord, email, and Notion. It can run from GitHub Actions or locally. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee.
+An internship alert and application-tracking system. The main watcher reads configured company boards plus SimplifyJobs, vanshb03, and Jobright feeds, filters every source, and routes individual postings to Discord, email, and Notion. It can run from GitHub Actions or locally. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee.
 
 The `internship-pinger` Cloudflare Worker is now in this repository. It triggers `watch.yml`, monitors completed main-branch runs, and sends hourly stale/failure warnings. Keep worker changes and watcher changes conceptually separate; its README and Node test are part of the repository.
 
@@ -38,5 +38,5 @@ The `internship-pinger` Cloudflare Worker is now in this repository. It triggers
 - Preserve `seen.json`, `delivery_state.json`, `message_map.json`, and `notion_state.json`. Deleting them can requeue or re-alert historical jobs.
 - The workflow always uploads state artifacts with seven-day retention. Persistence runs even after watcher failures and retries rebase/push up to three times; a rebase conflict leaves the artifact available for recovery.
 - Keep retries and state checkpoints durable. A run can fail after an external service accepted a request.
-- Do not add a new feed merely because it sounds useful; inspect whether it duplicates SimplifyJobs or Jobright.
+- Do not add a new feed merely because it sounds useful; inspect whether it duplicates SimplifyJobs, vanshb03, or Jobright. vanshb03 was added after measuring that most of its recent postings were not in SimplifyJobs; its links are `go.vansh.nyc` shortlinks, so URL identity cannot dedupe it.
 - Run `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. Keep setup and secret documentation useful for both GitHub Actions and local dry runs.

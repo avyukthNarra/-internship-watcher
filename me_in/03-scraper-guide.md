@@ -8,7 +8,7 @@
 2. **Load state.** `seen.json` plus `delivery_state.json` (`known_ids` and the pending queue). The previous `health.json` seeds source health.
 3. **Discover** (`discover`):
    - Run one fetcher per company in `config.json["companies"]` (16 threads). Each fetcher turns a board's JSON into a list of `{id, title, location, url}` dicts.
-   - Fetch SimplifyJobs and Jobright if enabled. These add `company` and `agg: True`.
+   - Fetch SimplifyJobs, vanshb03 and Jobright if enabled. These add `company` and `agg: True`.
    - **Filter every posting:** title must match an include keyword and no exclude keyword (`matches`), location must not be excluded (`location_excluded`), and the season must match (`term_matches`).
 4. **Find the new ones** (`select_new`). A job is new if its ID isn't in `seen`, its cross-source identity isn't known, and (for aggregator jobs) its fuzzy fingerprint hasn't been seen in the last `dedup_days`.
 5. **Queue before sending** (`queue_deliveries`). Each new job gets a list of destinations (`discord:<ENV_NAME>`, `email`, `notion`) in `delivery_state.json["pending"]`. State is saved to disk before anything is sent.
@@ -31,7 +31,7 @@ Every fetcher must return dicts shaped like this:
 }
 ```
 
-`discover` adds `company` for board sources. Aggregator fetchers set `company` and `agg: True` themselves. The `id` prefix (`greenhouse`, `lever`, `ashby`, `simplify`, `jobright`) is used for routing and for the Notion `Source` column, so a new source needs its own prefix.
+`discover` adds `company` for board sources. Aggregator fetchers set `company` and `agg: True` themselves. The `id` prefix (`greenhouse`, `lever`, `ashby`, `simplify`, `vanshb03`, `jobright`) is used for routing and for the Notion `Source` column, so a new source needs its own prefix.
 
 ## Adding a company that uses Greenhouse, Lever or Ashby
 
@@ -59,7 +59,7 @@ This is the 90% case and needs no code.
 
 ## Finding boards you don't track yet
 
-`python3 discover_boards.py --names companies.txt` (one name per line) or `--yc --min-team 10` guesses slugs from each company's name and website, probes Greenhouse, Lever and Ashby, and lists boards with internship postings. It never edits `config.json`. On 2026-10-27 it checked 780 YC companies in about 3 minutes and found 34 boards with internship postings. Read the list, drop non-fits, run `verify_boards.py --candidate ATS BOARD` on the rest, then add them. Expect a one-time burst of alerts for a new board's current postings.
+`python3 discover_boards.py --names companies.txt` (one name per line) or `--yc --min-team 10` (add `--industry robotics --industry hardware`, repeatable, to match YC industries and tags) guesses slugs from each company's name and website, probes Greenhouse, Lever and Ashby, and lists boards with internship postings. It never edits `config.json`. On 2026-10-27 it checked 780 YC companies in about 3 minutes and found 34 boards with internship postings. Read the list, drop non-fits, run `verify_boards.py --candidate ATS BOARD` on the rest, then add them. Expect a one-time burst of alerts for a new board's current postings.
 
 ## Adding a company on a different ATS (new adapter)
 
@@ -99,7 +99,7 @@ Pagination: `source_items` makes one request. If the ATS pages its results (Work
 Read `fetch_simplify` (JSON feed) and `fetch_jobright` (markdown table) as templates. Rules from `CLAUDE.md`: check first that it doesn't duplicate SimplifyJobs or Jobright. Then:
 
 1. Write `fetch_<name>(cfg)` returning the same dict shape plus `company`.
-2. Register it in the tuple in `discover` (`for name, fetcher in (("simplify", …), ("jobright", …))`) and give it a config block with `enabled`.
+2. Register it in the tuple in `discover` (`for name, fetcher in (("simplify", …), ("vanshb03", …), ("jobright", …))`) and give it a config block with `enabled`.
 3. Validate its config keys in `project_config.validate_config`.
 4. Use a unique `id` prefix. Treat any fetch/parse failure as a source failure (set `SOURCE_HEALTH`) rather than returning an empty list silently. `fetch_jobright` shows the pattern.
 
@@ -111,7 +111,7 @@ Read `fetch_simplify` (JSON feed) and `fetch_jobright` (markdown table) as templ
 | `exclude_locations` | Skips non-US places, but keeps anything with a US state code or "USA" |
 | `terms`, `keep_unknown_terms` | Season filter for all sources. Unknown seasons are kept by default |
 | `simplify.company_keywords` | Which companies to pull from the SimplifyJobs feed (word-boundary match) |
-| `simplify.max_age_days` / `jobright.max_age_days` | Ignore older aggregator posts (default 7) |
+| `simplify.max_age_days` / `jobright.max_age_days` / `vanshb03.max_age_days` | Ignore older aggregator posts (defaults 14, 7 and 7; the config sets vanshb03 to 3 to keep the first-run burst small) |
 | `dedup_days` | How long fuzzy cross-source duplicates are suppressed (default 30) |
 | `max_discord_per_run` | Discord posts per run (default 50); the rest wait in the queue |
 | `profiles` | Per-person routing to a personal webhook, keyed by Discord user ID |
@@ -124,7 +124,7 @@ A personal profile needs a webhook secret too. Add the mapping to the `PERSONAL_
 pip install -r requirements.txt
 python3 watcher.py --dry-run               # fetch + print, nothing written or sent
 python3 verify_boards.py                   # check every configured board
-python3 -m unittest discover -s tests -v   # 64 tests
+python3 -m unittest discover -s tests -v   # 112 tests
 node --test internship-pinger/worker.test.js
 ```
 

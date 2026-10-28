@@ -6,7 +6,7 @@ This repository monitors internship postings and routes matching jobs to Discord
 
 Each watcher run:
 
-1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs and Jobright feeds.
+1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs, vanshb03, and Jobright feeds. The vanshb03 feed (`vanshb03` in `config.json`, with `max_age_days` and `year`) is a separate list of internships whose links are the maintainer's `go.vansh.nyc` shortlinks; cross-feed duplicates are caught by the company, title, location, and season fingerprint, not by URL.
 2. Applies the title, location, and season filters to every source. The top-level `terms` list applies to all sources; `simplify.terms` remains a backward-compatible fallback only when top-level `terms` is absent. `keep_unknown_terms` controls whether a posting with no recognizable season term is retained and defaults to keeping unknown terms.
 3. Identifies postings by ATS identity or canonical URL. Known campaign parameters are removed, while other URL query parameters are preserved because they may identify the job. Exact identities remain known indefinitely. Cross-source fuzzy fingerprints are retained for `dedup_days` (30 days by default). Legacy `norm:` entries in state are ignored for matching and are not removed.
 4. Places each new job into `delivery_state.json` with its individual destinations. Discord notifications are individual posts and retain the 📌 instruction. There are no digest messages. `max_discord_per_run` defaults to 50; undelivered destinations remain queued for a later run.

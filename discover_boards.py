@@ -90,11 +90,20 @@ def discover(company, matcher):
     return found
 
 
-def load_yc(min_team):
+def yc_matches(company, wanted):
+    """True when any wanted word appears in the company's industries or tags."""
+    if not wanted:
+        return True
+    labels = [*(company.get("industries") or []), *(company.get("tags") or []),
+              company.get("subindustry") or ""]
+    return any(w.lower() in label.lower() for w in wanted for label in labels)
+
+
+def load_yc(min_team, wanted=()):
     companies = requests.get(YC_URL, headers=HEADERS, timeout=60).json()
     return [{"name": c["name"], "website": c.get("website", "")} for c in companies
             if c.get("isHiring") and c.get("status") == "Active"
-            and (c.get("team_size") or 0) >= min_team]
+            and (c.get("team_size") or 0) >= min_team and yc_matches(c, wanted)]
 
 
 def main(argv=None):
@@ -103,6 +112,9 @@ def main(argv=None):
     source.add_argument("--names", type=Path, help="Text file with one company name per line")
     source.add_argument("--yc", action="store_true", help="Y Combinator companies marked as hiring")
     parser.add_argument("--min-team", type=int, default=10, help="With --yc: minimum team size")
+    parser.add_argument("--industry", action="append", default=[], metavar="WORD",
+                        help="With --yc: keep companies whose industry or tags contain WORD "
+                             "(repeatable, for example --industry robotics --industry semiconductor)")
     parser.add_argument("--limit", type=int, default=0, help="Only check the first N companies")
     parser.add_argument("--min-interns", type=int, default=1,
                         help="Only report boards with at least this many matching postings")
@@ -118,7 +130,7 @@ def main(argv=None):
     tracked_names = {c["name"].lower() for c in cfg["companies"]}
 
     if args.yc:
-        companies = load_yc(args.min_team)
+        companies = load_yc(args.min_team, args.industry)
     else:
         companies = [{"name": line.strip()} for line in args.names.read_text().splitlines()
                      if line.strip() and not line.startswith("#")]

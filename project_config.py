@@ -47,6 +47,7 @@ def validate_config(cfg):
     _booleans(cfg, ("keep_unknown_terms",))
 
     for name, list_keys in (("simplify", ("terms", "company_keywords", "include_categories")),
+                            ("vanshb03", ()),
                             ("jobright", ("repos",))):
         feed = cfg.get(name, {})
         if not isinstance(feed, dict):
@@ -58,7 +59,7 @@ def validate_config(cfg):
                     raise ValueError(f"{name}.{option} must map category names to keyword lists")
                 for category, words in feed[option].items():
                     _string_lists({category: words}, (category,), f"{name}.{option}.")
-        _non_negative_integers(feed, ("max_age_days",), name + ".")
+        _non_negative_integers(feed, ("max_age_days", "year"), name + ".")
         _booleans(feed, ("enabled",), name + ".")
         if "url" in feed and not isinstance(feed["url"], str):
             raise ValueError(name + ".url must be a string")

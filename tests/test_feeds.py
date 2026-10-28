@@ -113,6 +113,46 @@ class FilteringAndRoutingTests(unittest.TestCase):
             self.assertEqual(watcher.destinations(farmers, cfg), ["discord:DISCORD_WEBHOOK_URL"])
 
 
+class Vanshb03Tests(unittest.TestCase):
+    def listing(self, jid, **overrides):
+        return {"id": jid, "active": True, "is_visible": True, "date_posted": time.time(),
+                "company_name": "Rockwell", "title": "Firmware Intern", "season": "Summer",
+                "locations": ["Austin, TX", "Dallas, TX", "Plano, TX", "Frisco, TX"],
+                "url": f"https://go.vansh.nyc/{jid}", **overrides}
+
+    def fetch(self, data, **feed):
+        cfg = {"vanshb03": {"enabled": True, **feed}}
+        with patch.object(watcher, "source_items", return_value=data):
+            return watcher.fetch_vanshb03(cfg)
+
+    def test_maps_fields_and_labels_seasons_like_simplify(self):
+        job, = self.fetch([self.listing("a")])
+        self.assertEqual(job["id"], "vanshb03:a")
+        self.assertEqual(job["terms"], ["Summer 2027"])
+        self.assertEqual(job["location"], "Austin, TX, Dallas, TX, Plano, TX")
+        self.assertEqual(job["url"], "https://go.vansh.nyc/a")
+
+    def test_fall_belongs_to_the_previous_year_and_slashes_split(self):
+        self.assertEqual(watcher.vanshb03_terms("Fall", 2027), ["Fall 2026"])
+        self.assertEqual(watcher.vanshb03_terms("Spring/Summer", 2027), ["Spring 2027", "Summer 2027"])
+        self.assertEqual(watcher.vanshb03_terms(None, 2027), [])
+
+    def test_inactive_hidden_and_old_listings_are_skipped(self):
+        data = [self.listing("ok"), self.listing("off", active=False),
+                self.listing("hid", is_visible=False),
+                self.listing("old", date_posted=time.time() - 30 * 86400),
+                self.listing("undated", date_posted=None)]
+        self.assertEqual([j["id"] for j in self.fetch(data)], ["vanshb03:ok"])
+        old = self.fetch(data, max_age_days=60)
+        self.assertIn("vanshb03:old", [j["id"] for j in old])
+
+    def test_matches_a_simplify_listing_for_cross_feed_dedup(self):
+        from job_utils import fingerprint
+        simplify = {"company": "Rockwell", "title": "Firmware Intern", "terms": ["Summer 2027"],
+                    "location": "Austin, TX, Dallas, TX, Plano, TX"}
+        self.assertEqual(fingerprint(self.fetch([self.listing("a")])[0]), fingerprint(simplify))
+
+
 class CategoryTests(unittest.TestCase):
     def listing(self, jid, company, category):
         return {"id": jid, "active": True, "date_posted": time.time(), "company_name": company,

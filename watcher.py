@@ -44,6 +44,11 @@ SIMPLIFY_URL = (
     "Summer2027-Internships/dev/.github/scripts/listings.json"
 )
 
+VANSHB03_URL = (
+    "https://raw.githubusercontent.com/vanshb03/"
+    "Summer2027-Internships/dev/.github/scripts/listings.json"
+)
+
 HEADERS = {"User-Agent": "internship-watcher/1.0 (personal job alert script)"}
 TIMEOUT = 20
 
@@ -277,6 +282,36 @@ def fetch_simplify(cfg):
     return out
 
 
+def vanshb03_terms(season, year):
+    """The feed gives a bare season ("Fall"); label it like Simplify does so the
+    season filter and the cross-source fingerprint treat both feeds alike."""
+    names = [w.strip().title() for w in str(season or "").split("/") if w.strip()]
+    return [f"{name} {year - 1 if name == 'Fall' else year}" for name in names]
+
+
+def fetch_vanshb03(cfg):
+    """vanshb03's internship list: same schema family as SimplifyJobs, but a
+    different set of postings. Links are the maintainer's go.vansh.nyc shortlinks."""
+    feed = cfg.get("vanshb03", {})
+    cutoff = time.time() - feed.get("max_age_days", 7) * 86400
+    year = feed.get("year", 2027)
+    out = []
+    for j in source_items(feed.get("url", VANSHB03_URL)):
+        if not j.get("active") or not j.get("is_visible", True):
+            continue
+        if (j.get("date_posted") or 0) < cutoff:
+            continue
+        out.append({
+            "id": f"vanshb03:{j.get('id')}",
+            "terms": vanshb03_terms(j.get("season"), year),
+            "company": j.get("company_name") or "",
+            "title": j.get("title") or "",
+            "location": ", ".join((j.get("locations") or [])[:3]),
+            "url": j.get("url") or "",
+        })
+    return out
+
+
 JOBRIGHT_ROW = re.compile(
     r"^\|\s*(?:\*\*\[(?P<company>.+?)\]\(.*?\)\*\*|↳)\s*"
     r"\|\s*\*\*\[(?P<title>.+?)\]\((?P<url>https://jobright\.ai/jobs/info/(?P<jid>[0-9a-f]+)\S*?)\)\*\*\s*"
@@ -414,7 +449,8 @@ def discover(cfg):
     with ThreadPoolExecutor(max_workers=16) as executor:
         for company, found in executor.map(company_jobs, cfg.get("companies", [])):
             jobs.extend({**j, "company": company["name"]} for j in found)
-    for name, fetcher in (("simplify", fetch_simplify), ("jobright", fetch_jobright)):
+    for name, fetcher in (("simplify", fetch_simplify), ("vanshb03", fetch_vanshb03),
+                           ("jobright", fetch_jobright)):
         if cfg.get(name, {}).get("enabled", name == "simplify"):
             try:
                 jobs.extend({**j, "agg": True} for j in fetcher(cfg))

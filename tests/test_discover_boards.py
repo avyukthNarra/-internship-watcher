@@ -20,6 +20,17 @@ class SlugTests(unittest.TestCase):
         self.assertFalse(discover.same_company("", "x"))
 
 
+class YcFilterTests(unittest.TestCase):
+    def test_industry_words_match_industries_tags_and_subindustry(self):
+        robot = {"industries": ["Industrials"], "tags": ["Robotics"], "subindustry": "Industrials -> Manufacturing"}
+        fintech = {"industries": ["Fintech"], "tags": ["Payments"], "subindustry": "Fintech"}
+        self.assertTrue(discover.yc_matches(robot, ["robot"]))
+        self.assertTrue(discover.yc_matches(robot, ["nothing", "MANUFACTURING"]))
+        self.assertFalse(discover.yc_matches(fintech, ["robot", "space"]))
+        self.assertTrue(discover.yc_matches(fintech, []))  # no filter keeps everyone
+        self.assertFalse(discover.yc_matches({}, ["robot"]))
+
+
 class ProbeTests(unittest.TestCase):
     def response(self, status, payload=None):
         return Mock(status_code=status, json=lambda: payload)
