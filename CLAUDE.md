@@ -39,4 +39,5 @@ The `internship-pinger` Cloudflare Worker is now in this repository. It triggers
 - The workflow always uploads state artifacts with seven-day retention. Persistence runs even after watcher failures and retries rebase/push up to three times; a rebase conflict leaves the artifact available for recovery.
 - Keep retries and state checkpoints durable. A run can fail after an external service accepted a request.
 - Do not add a new feed merely because it sounds useful; inspect whether it duplicates SimplifyJobs, vanshb03, or Jobright. vanshb03 was added after measuring that most of its recent postings were not in SimplifyJobs; its links are `go.vansh.nyc` shortlinks, so URL identity cannot dedupe it.
+- Record user-visible changes (new sources, config keys, behavior changes, fixes) in `CHANGELOG.md` under Unreleased; follow semver as described there. Do not tag or bump a version without the owner.
 - Run `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. Keep setup and secret documentation useful for both GitHub Actions and local dry runs.
