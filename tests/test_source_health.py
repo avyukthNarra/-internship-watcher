@@ -25,7 +25,7 @@ class SourceHealthTests(unittest.TestCase):
         self.assertEqual(health["sources"]["new"]["failing_since"], health["last_completed_scan"])
         self.assertNotIn("failing_since", health["sources"]["recovered"])
         self.assertEqual(sources, before)
-        self.assertEqual(health_exit_code(health), 0)
+        self.assertEqual(health_exit_code(health), 1)
         self.assertIn("2 failed (1 down 5h+)", health_summary(health))
 
     def test_short_outage_succeeds_but_pending_delivery_or_sync_error_fails(self):
@@ -39,8 +39,27 @@ class SourceHealthTests(unittest.TestCase):
                              {"down": {"failing_since": 1, "issue": 7}, "back": {"issue": 8}})
         self.assertEqual(health["sources"]["down"]["issue"], 7)
         self.assertNotIn("issue", health["sources"]["back"])
-        outage = {str(i): {"ok": False} for i in range(MAX_STALE_SOURCES + 1)}
-        self.assertEqual(health_exit_code(self.health(outage, {k: {"failing_since": 1} for k in outage})), 1)
+        # Fetchers copy the previous record, so a recovered source can arrive with its old issue.
+        recovered = self.health({"back": {"ok": True, "issue": 8, "failing_since": 1}})
+        self.assertNotIn("issue", recovered["sources"]["back"])
+
+    def test_more_than_max_stale_sources_fails_even_below_the_fraction(self):
+        count = MAX_STALE_SOURCES + 1
+        sources = {f"s{i}": {"ok": i >= count} for i in range(100)}
+        health = self.health(sources, {f"s{i}": {"failing_since": 1} for i in range(count)})
+        self.assertEqual(health_exit_code(health), 1)
+
+    def test_one_stale_source_warns_but_a_broad_outage_fails(self):
+        def stale(count, total):
+            sources = {f"s{i}": {"ok": i >= count} for i in range(total)}
+            previous = {f"s{i}": {"failing_since": 1} for i in range(count)}
+            return self.health(sources, previous)
+        one_of_twenty = stale(1, 20)
+        self.assertEqual(one_of_twenty["stale_failed_sources"], 1)
+        self.assertEqual(health_exit_code(one_of_twenty), 0)
+        self.assertIn("1 failed (1 down 5h+)", health_summary(one_of_twenty))
+        self.assertEqual(health_exit_code(stale(2, 20)), 1)
+        self.assertEqual(health_exit_code(stale(1, 3)), 1)
 
     def test_unpolled_sources_do_not_remain_stale(self):
         health = self.health({}, {"removed": {"ok": False, "failing_since": 1}})

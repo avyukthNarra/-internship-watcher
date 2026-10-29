@@ -6,10 +6,17 @@
     "coop"
   ],
   "exclude_keywords": [
+    "chemical",
+    "chemistry",
+    "structural",
+    "geotechnical",
+    "hvac",
+    "welding",
     "unpaid",
     "internal",
     "mechanical",
     "civil engineer",
+    "civil engineering",
     "legal",
     "paralegal",
     "sales",
@@ -722,8 +729,8 @@
     },
     {
       "name": "Old Mission",
-      "ats": "greenhouse",
-      "board": "oldmissioncapital"
+      "ats": "ashby",
+      "board": "old-mission-capital"
     },
     {
       "name": "PDT Partners",
@@ -954,10 +961,174 @@
       "name": "Quora",
       "ats": "ashby",
       "board": "quora"
+    },
+    {
+      "name": "Astranis",
+      "ats": "greenhouse",
+      "board": "astranis"
+    },
+    {
+      "name": "Instawork",
+      "ats": "greenhouse",
+      "board": "instawork"
+    },
+    {
+      "name": "Gecko Robotics",
+      "ats": "ashby",
+      "board": "gecko-robotics"
+    },
+    {
+      "name": "Eight Sleep",
+      "ats": "ashby",
+      "board": "eightsleep"
+    },
+    {
+      "name": "Odys Aviation",
+      "ats": "ashby",
+      "board": "odys-aviation"
+    },
+    {
+      "name": "Multiply Labs",
+      "ats": "lever",
+      "board": "multiplylabs"
+    },
+    {
+      "name": "Mach9",
+      "ats": "ashby",
+      "board": "mach9"
+    },
+    {
+      "name": "Orbital Operations",
+      "ats": "greenhouse",
+      "board": "orbitaloperations"
+    },
+    {
+      "name": "AfterQuery",
+      "ats": "ashby",
+      "board": "afterquery"
+    },
+    {
+      "name": "Taktile",
+      "ats": "ashby",
+      "board": "taktile"
+    },
+    {
+      "name": "Auctor",
+      "ats": "ashby",
+      "board": "auctor"
+    },
+    {
+      "name": "CTGT",
+      "ats": "ashby",
+      "board": "ctgt"
+    },
+    {
+      "name": "Flint",
+      "ats": "ashby",
+      "board": "flint"
+    },
+    {
+      "name": "HackerRank",
+      "ats": "greenhouse",
+      "board": "hackerrank"
+    },
+    {
+      "name": "Juicebox",
+      "ats": "ashby",
+      "board": "juicebox"
+    },
+    {
+      "name": "Overview",
+      "ats": "ashby",
+      "board": "overview"
+    },
+    {
+      "name": "Phonely",
+      "ats": "ashby",
+      "board": "phonely"
+    },
+    {
+      "name": "Sendbird",
+      "ats": "greenhouse",
+      "board": "sendbird"
+    },
+    {
+      "name": "Bitmovin",
+      "ats": "greenhouse",
+      "board": "bitmovin"
+    },
+    {
+      "name": "Kalshi",
+      "ats": "ashby",
+      "board": "kalshi"
+    },
+    {
+      "name": "Belvedere Trading",
+      "ats": "lever",
+      "board": "belvederetrading"
+    },
+    {
+      "name": "Quadrature Capital",
+      "ats": "greenhouse",
+      "board": "quadraturecapital"
+    },
+    {
+      "name": "Lightmatter",
+      "ats": "greenhouse",
+      "board": "lightmatter"
+    },
+    {
+      "name": "IonQ",
+      "ats": "greenhouse",
+      "board": "ionq"
+    },
+    {
+      "name": "Rigetti",
+      "ats": "lever",
+      "board": "rigetti"
+    },
+    {
+      "name": "Spaceium",
+      "ats": "greenhouse",
+      "board": "spaceium"
+    },
+    {
+      "name": "Brumby",
+      "ats": "ashby",
+      "board": "brumby"
+    },
+    {
+      "name": "One Robot",
+      "ats": "ashby",
+      "board": "onerobot"
     }
   ],
+  "vanshb03": {
+    "enabled": true,
+    "max_age_days": 3,
+    "year": 2027
+  },
   "simplify": {
     "enabled": true,
+    "include_categories": [
+      "Hardware",
+      "Quant"
+    ],
+    "category_exclude": {
+      "Hardware": [
+        "materials",
+        "metallurgy",
+        "metallurgical",
+        "process engineer",
+        "facilities",
+        "environmental",
+        "safety",
+        "machinist",
+        "technician",
+        "electrician",
+        "construction"
+      ]
+    },
     "terms": [
       "Fall 2026",
       "Winter 2027",
@@ -1059,5 +1230,158 @@
   "dedup_days": 30,
   "max_discord_per_run": 50,
   "follow_up_days": 14,
+  "alert_channels": [
+    {
+      "name": "swe",
+      "webhook_env": "DISCORD_WEBHOOK_SWE",
+      "roles": [
+        "software",
+        "swe",
+        "backend",
+        "frontend",
+        "full stack",
+        "fullstack",
+        "web",
+        "mobile",
+        "devops",
+        "platform",
+        "infrastructure"
+      ],
+      "exclude_roles": [
+        "embedded",
+        "firmware",
+        "fpga",
+        "rtl",
+        "asic",
+        "microcontroller",
+        "rtos",
+        "device driver",
+        "bare metal",
+        "linux kernel"
+      ]
+    },
+    {
+      "name": "data",
+      "webhook_env": "DISCORD_WEBHOOK_DATA",
+      "roles": [
+        "data",
+        "analytics",
+        "analyst",
+        "business intelligence"
+      ]
+    },
+    {
+      "name": "research",
+      "webhook_env": "DISCORD_WEBHOOK_RESEARCH",
+      "roles": [
+        "research",
+        "scientist"
+      ]
+    },
+    {
+      "name": "ml",
+      "webhook_env": "DISCORD_WEBHOOK_ML",
+      "roles": [
+        "machine learning",
+        "ml",
+        "ai",
+        "deep learning",
+        "computer vision",
+        "nlp",
+        "llm",
+        "artificial intelligence",
+        "generative"
+      ]
+    },
+    {
+      "name": "embedded",
+      "webhook_env": "DISCORD_WEBHOOK_EMBEDDED",
+      "roles": [
+        "embedded",
+        "firmware",
+        "fpga",
+        "rtl",
+        "asic",
+        "microcontroller",
+        "rtos",
+        "device driver",
+        "bare metal",
+        "linux kernel"
+      ]
+    },
+    {
+      "name": "hardware",
+      "webhook_env": "DISCORD_WEBHOOK_HARDWARE",
+      "categories": [
+        "Hardware"
+      ],
+      "exclude_roles": [
+        "embedded",
+        "firmware",
+        "fpga",
+        "rtl",
+        "asic",
+        "microcontroller",
+        "rtos",
+        "device driver",
+        "bare metal",
+        "linux kernel"
+      ]
+    },
+    {
+      "name": "hardware-by-title",
+      "webhook_env": "DISCORD_WEBHOOK_HARDWARE",
+      "roles": [
+        "hardware",
+        "electrical",
+        "electronics",
+        "circuit",
+        "pcb",
+        "analog",
+        "digital design",
+        "verification",
+        "validation",
+        "silicon",
+        "semiconductor",
+        "optical",
+        "photonics",
+        "thermal",
+        "rf",
+        "power electronics",
+        "test engineer",
+        "manufacturing"
+      ],
+      "exclude_roles": [
+        "embedded",
+        "firmware",
+        "fpga",
+        "rtl",
+        "asic",
+        "microcontroller",
+        "rtos",
+        "device driver",
+        "bare metal",
+        "linux kernel"
+      ]
+    },
+    {
+      "name": "quant",
+      "webhook_env": "DISCORD_WEBHOOK_QUANT",
+      "categories": [
+        "Quant"
+      ]
+    },
+    {
+      "name": "quant-by-title",
+      "webhook_env": "DISCORD_WEBHOOK_QUANT",
+      "roles": [
+        "quant",
+        "quantitative",
+        "trading",
+        "trader",
+        "market making"
+      ]
+    }
+  ],
   "profiles": {}
 }

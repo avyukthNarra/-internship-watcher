@@ -2,7 +2,7 @@
 
 ## What this is
 
-An internship alert and application-tracking system. The main watcher reads configured company boards plus SimplifyJobs and Jobright feeds, filters every source, and routes individual postings to Discord, email, and Notion. It can run from GitHub Actions or locally. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee.
+An internship alert and application-tracking system. The main watcher reads configured company boards plus SimplifyJobs, vanshb03, and Jobright feeds, filters every source, and routes individual postings to Discord, email, and Notion. It can run from GitHub Actions or locally. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee.
 
 The `internship-pinger` Cloudflare Worker is now in this repository. It triggers `watch.yml`, monitors completed main-branch runs, and sends hourly stale/failure warnings. Keep worker changes and watcher changes conceptually separate; its README and Node test are part of the repository.
 
@@ -15,7 +15,7 @@ The `internship-pinger` Cloudflare Worker is now in this repository. It triggers
 - `job_utils.py` canonicalizes URLs while preserving meaningful query parameters. Exact job identities persist. Cross-source fuzzy fingerprints expire after `dedup_days` (default 30). Legacy `norm:` entries in state are ignored for matching, not removed.
 - `delivery_state.json` is the durable per-destination queue for Discord, email, and Notion. `max_discord_per_run` defaults to 50. Discord uses individual posts and keeps 📌 pins; there are no digest messages.
 - `health.json` records the last completed scan, source health, pending deliveries, and sync errors. A failed run leaves checkpointed work for retry.
-- A source down 5h+ does not fail the run: the watcher opens one `source-down` GitHub issue (number kept in `health.json`), closes it when the source recovers, and dispatches `source-doctor.yml`, where Claude investigates and opens a PR. Only more than `MAX_STALE_SOURCES` (5) stale sources at once, pending deliveries, or sync errors fail the run. The doctor needs a `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` secret.
+- A source down 5h+ does not fail the run: the watcher opens one `source-down` GitHub issue (number kept in `health.json`), closes it when the source recovers, and dispatches `source-doctor.yml`, where Claude investigates and opens a PR. Only a broad outage (more than `MAX_STALE_SOURCES` (5) stale sources, or `BROAD_OUTAGE_FRACTION` (10%) of sources), pending deliveries, or sync errors fail the run. Deliveries that keep failing are parked in `delivery_state.json["dead"]` and do not count as pending. The doctor needs a `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` secret.
 - `notion_state.json` durably tracks `pending_pins` and `pending_applied`. Applied rows set `Applied On` and a follow-up date; `follow_up_days` defaults to 14, supports per-profile overrides, and `0` disables the date. Stats report status counts and due follow-ups.
 - Notion upserts query existing rows by canonical job identity, including legacy rows, so existing history does not need a reseed migration. Previously stripped URLs are not automatically repairable.
 - Applied-link parsing may fetch HTML metadata after trying ATS APIs. Do not claim that the project never fetches HTML.
@@ -39,5 +39,6 @@ The `internship-pinger` Cloudflare Worker is now in this repository. It triggers
 - Preserve `seen.json`, `delivery_state.json`, `message_map.json`, and `notion_state.json`. Deleting them can requeue or re-alert historical jobs.
 - The workflow always uploads state artifacts with seven-day retention. Persistence runs even after watcher failures and retries rebase/push up to three times; a rebase conflict leaves the artifact available for recovery.
 - Keep retries and state checkpoints durable. A run can fail after an external service accepted a request.
-- Do not add a new feed merely because it sounds useful; inspect whether it duplicates SimplifyJobs or Jobright.
+- Do not add a new feed merely because it sounds useful; inspect whether it duplicates SimplifyJobs, vanshb03, or Jobright. vanshb03 was added after measuring that most of its recent postings were not in SimplifyJobs; its links are `go.vansh.nyc` shortlinks, so URL identity cannot dedupe it.
+- Record user-visible changes (new sources, config keys, behavior changes, fixes) in `CHANGELOG.md` under Unreleased; follow semver as described there. Do not tag or bump a version without the owner.
 - Run `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. Keep setup and secret documentation useful for both GitHub Actions and local dry runs.

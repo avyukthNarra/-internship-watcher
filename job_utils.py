@@ -31,6 +31,26 @@ def save_json(path, data):
             os.unlink(temp)
 
 
+_CONTROL_CHARS = re.compile(r'[\x00-\x1f\x7f]+')
+
+
+def clean_text(value):
+    """A feed field as a single-line string; null and control characters become blank."""
+    return '' if value is None else _CONTROL_CHARS.sub(' ', str(value)).strip()
+
+
+def clean_job(job):
+    """Normalize untrusted feed fields so one odd posting cannot crash a run
+    or produce an invalid Discord/Notion payload. Non-http(s) URLs are blanked."""
+    cleaned = dict(job)
+    for field in ('company', 'title', 'location', 'url'):
+        cleaned[field] = clean_text(job.get(field))
+    if urlsplit(cleaned['url']).scheme.lower() not in ('http', 'https'):
+        cleaned['url'] = ''
+    cleaned['title'] = cleaned['title'] or 'Untitled'
+    return cleaned
+
+
 def canonical_url(url):
     """Remove known campaign tags, preserving job IDs and SPA fragments."""
     p = urlsplit(url or '')
@@ -60,8 +80,11 @@ def job_identity(job):
     return 'url:' + url if url else 'id:' + job['id']
 
 
+UNKNOWN_TERMS = {'', 'n/a', 'na', 'none', 'unknown', 'tbd'}
+
+
 def job_terms(job):
-    explicit = job.get('terms') or []
+    explicit = [t for t in (job.get('terms') or []) if str(t).strip().lower() not in UNKNOWN_TERMS]
     inferred = re.findall(r'\b(Fall|Winter|Spring|Summer|Autumn)\s*[-/]?\s*(20\d{2})\b',
                           job.get('title', ''), re.I)
     return sorted({s.lower().replace('autumn', 'fall') for s in explicit}
@@ -89,12 +112,21 @@ def fingerprint(job):
 
 
 def preference_matches(job, preferences):
-    """All configured dimensions must match; empty lists impose no restriction."""
+    """All configured dimensions must match; empty lists impose no restriction.
+    `categories` matches the SimplifyJobs category (for example Hardware, Quant);
+    `exclude_roles` rejects titles containing any listed word."""
     for key, field in (('roles', 'title'), ('companies', 'company'),
                        ('locations', 'location')):
         wanted = preferences.get(key, [])
         if wanted and not any(re.search(r'\b' + re.escape(s.lower()) + r'\b',
                                          job.get(field, '').lower()) for s in wanted):
             return False
+    blocked = preferences.get('exclude_roles', [])
+    if any(re.search(r'\b' + re.escape(s.lower()) + r'\b', job.get('title', '').lower())
+           for s in blocked):
+        return False
+    categories = {c.lower() for c in preferences.get('categories', [])}
+    if categories and (job.get('category') or '').lower() not in categories:
+        return False
     return term_matches(job, preferences.get('terms', []),
                         preferences.get('keep_unknown_terms', True))

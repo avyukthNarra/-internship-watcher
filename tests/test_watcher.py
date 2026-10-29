@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 import requests
 import watcher
 import notion_sync as notion
-from job_utils import canonical_url, job_identity, fingerprint, term_matches, preference_matches, load_json
+from job_utils import canonical_url, job_identity, job_terms, fingerprint, term_matches, preference_matches, load_json
 
 
 def job(jid='greenhouse:example:123', **kwargs):
@@ -21,6 +21,63 @@ def page(j, status='Saved', pid='page-1'):
     return {'id': pid, 'properties': {
         'Link': {'url': j['url']}, 'Status': {'select': {'name': status}},
         'Role': {'title': [{'plain_text': j['title']}]}}}
+
+
+class UnknownSeasonTests(unittest.TestCase):
+    def test_na_is_an_unknown_season_not_a_mismatch(self):
+        j = {'title': 'Firmware Intern', 'terms': ['N/A']}
+        self.assertEqual(job_terms(j), [])
+        self.assertTrue(term_matches(j, ['Summer 2027']))
+        self.assertFalse(term_matches(j, ['Summer 2027'], keep_unknown=False))
+        self.assertFalse(term_matches({**j, 'terms': ['Summer 2026']}, ['Summer 2027']))
+        self.assertFalse(term_matches({**j, 'title': 'Firmware Intern 2026'}, ['Summer 2027']))
+        self.assertTrue(term_matches({**j, 'terms': ['N/A', 'Summer 2027']}, ['Summer 2027']))
+
+
+class CleanJobTests(unittest.TestCase):
+    def test_normalizes_nulls_controls_and_schemes(self):
+        from job_utils import clean_job
+        cleaned = clean_job({'id': 'a', 'company': None, 'title': 'SWE\nIntern\x00', 'location': None,
+                             'url': 'ftp://x.example/1', 'terms': ['Summer 2027']})
+        self.assertEqual((cleaned['company'], cleaned['title'], cleaned['location'], cleaned['url']),
+                         ('', 'SWE Intern', '', ''))
+        self.assertEqual(cleaned['terms'], ['Summer 2027'])
+        self.assertEqual(clean_job({'id': 'b', 'title': ' '})['title'], 'Untitled')
+
+    def test_valid_job_identity_is_unchanged(self):
+        from job_utils import clean_job
+        j = job()
+        self.assertEqual(job_identity(clean_job(j)), job_identity(j))
+        self.assertEqual(fingerprint(clean_job(j)), fingerprint(j))
+
+
+class KeywordTests(unittest.TestCase):
+    INCLUDE = ["intern", "internship", "co-op", "coop"]
+    EXCLUDE = ["internal", "sales", "marketing", "mba", " mba", "mba ", "ph.d", "hr intern"]
+
+    def check(self, title):
+        return watcher.matches(title, self.INCLUDE, self.EXCLUDE)
+
+    def test_intern_is_a_whole_word(self):
+        for title in ("Software Engineer Intern", "Software Engineering Interns",
+                      "Data Science Intern, Summer 2027", "Backend Co-op", "SWE Internship"):
+            self.assertTrue(self.check(title), title)
+        for title in ("International Payments Engineer", "Internet Infrastructure Engineer",
+                      "Internal Tools Engineer"):
+            self.assertFalse(self.check(title), title)
+
+    def test_exclusions_do_not_hide_engineering_roles(self):
+        self.assertTrue(self.check("Salesforce Developer Intern"))
+        self.assertFalse(self.check("Sales Intern"))
+        self.assertFalse(self.check("Marketing Intern"))
+        self.assertFalse(self.check("MBA Intern"))
+        self.assertFalse(self.check("HR Intern"))
+        self.assertFalse(self.check("PH.D. Research Intern"))
+
+    def test_missing_title_and_empty_lists(self):
+        self.assertFalse(watcher.matches(None, self.INCLUDE, self.EXCLUDE))
+        self.assertFalse(watcher.matches("SWE Intern", [], []))
+        self.assertTrue(watcher.matches("SWE Intern", self.INCLUDE, []))
 
 
 class IdentityTests(unittest.TestCase):
@@ -119,6 +176,70 @@ class DeliveryTests(unittest.TestCase):
         post.side_effect = requests.Timeout()
         self.assertEqual(watcher.notify_discord('https://example.invalid/hook', [job()])[1], {job()['id']})
 
+    @patch('watcher.time.sleep')
+    @patch('watcher.requests.post')
+    def test_untrusted_text_cannot_rewrite_discord_link(self, post, sleep):
+        post.return_value = Mock(status_code=200, json=lambda: {'id': 'm', 'channel_id': 'c'})
+        hostile = {**job(), 'title': 'Intern](https://evil.example) [x', 'url': 'https://a.example/p(1) 2'}
+        watcher.notify_discord('https://example.invalid/hook', [hostile])
+        content = post.call_args.kwargs['json']['content']
+        self.assertIn('[Intern)(https://evil.example) (x](https://a.example/p%281%29%202)', content)
+        self.assertEqual(content.count('](http'), 1)
+
+    def test_null_feed_fields_do_not_crash_discovery(self):
+        board = [{'id': 'lever:x:1', 'title': None, 'location': None, 'url': 'javascript:alert(1)'},
+                 {'id': 'lever:x:2', 'title': 'SWE Intern', 'location': None, 'url': 'https://x.example/2'}]
+        cfg = {'companies': [{'name': 'X', 'ats': 'lever', 'board': 'x'}], 'include_keywords': ['intern'],
+               'simplify': {'enabled': False}}
+        with patch.dict(watcher.ATS_FETCHERS, {'lever': lambda board_name: board}):
+            found = watcher.discover(cfg)
+        self.assertEqual([j['id'] for j in found], ['lever:x:2'])
+        self.assertEqual(found[0]['location'], '')
+        fingerprint(found[0])  # previously AttributeError on a null location
+
+    def queue(self, *jobs):
+        return {'pending': {j['id']: {'job': j, 'destinations': ['email'], 'created': 0} for j in jobs}}
+
+    def test_unexpected_error_does_not_block_later_jobs(self):
+        bad, good = job('a:1'), job('a:2')
+        ledger = self.queue(bad, good)
+        sent = []
+        def send(cfg, jobs):
+            if jobs[0]['id'] == 'a:1':
+                raise TypeError('boom')
+            sent.append(jobs[0]['id'])
+        with patch.object(watcher, 'notify_email', side_effect=send):
+            watcher.deliver(ledger, {}, {}, lambda: None)
+        self.assertEqual(sent, ['a:2'])
+        self.assertEqual(list(ledger['pending']), ['a:1'])
+        self.assertEqual(ledger['pending']['a:1']['error'], 'TypeError')
+
+    def test_repeated_failure_is_parked_and_stops_failing_runs(self):
+        from source_health import build_health, health_exit_code, health_summary
+        ledger = self.queue(job('a:1'))
+        cfg = {'max_delivery_attempts': 3}
+        with patch.object(watcher, 'notify_email', side_effect=ValueError('bad')):
+            for _ in range(2):
+                watcher.deliver(ledger, cfg, {}, lambda: None)
+            self.assertIn('a:1', ledger['pending'])
+            watcher.deliver(ledger, cfg, {}, lambda: None)
+        self.assertEqual(ledger['pending'], {})
+        parked = ledger['dead']['a:1|email']
+        self.assertEqual((parked['attempts'], parked['error']), (3, 'ValueError'))
+        health = build_health({}, {}, now=1, matching_jobs=0, new_jobs=0, pending_deliveries=0,
+                              sync_error=None, dead_deliveries=len(ledger['dead']))
+        self.assertEqual(health_exit_code(health), 0)
+        self.assertIn('parked: 1', health_summary(health))
+
+    def test_success_clears_attempt_count(self):
+        ledger = self.queue(job('a:1'))
+        with patch.object(watcher, 'notify_email', side_effect=[ValueError('x'), None]):
+            watcher.deliver(ledger, {}, {}, lambda: None)
+            self.assertEqual(ledger['pending']['a:1']['tries'], {'email': 1})
+            watcher.deliver(ledger, {}, {}, lambda: None)
+        self.assertEqual(ledger['pending'], {})
+        self.assertEqual(ledger.get('dead', {}), {})
+
     def test_dry_run_unchanged_even_with_credentials(self):
         before = {p.name: p.read_bytes() for p in self.root.iterdir()}
         with patch.dict(os.environ, {'DISCORD_WEBHOOK_URL': 'test'}, clear=True), \
@@ -214,11 +335,13 @@ class DeliveryTests(unittest.TestCase):
     def test_stale_source_opens_one_issue_without_failing_run(self):
         url = 'https://boards-api.greenhouse.io/v1/boards/gone/jobs'
         down = {'ok': False, 'error': 'HTTP 404', 'failing_since': 1}
-        code, sources, api = self.run_with_sources({url: down}, {url: down})
+        # One dead board among many healthy ones, below the broad-outage share.
+        healthy = {f'https://example.invalid/{i}': {'ok': True, 'last_success': 1} for i in range(20)}
+        code, sources, api = self.run_with_sources({url: down, **healthy}, {url: down})
         self.assertEqual(code, 0)
         self.assertEqual(sources[url]['issue'], 7)
         self.assertEqual(api.call_args.args[:2], ('POST', 'issues'))
-        code, _, api = self.run_with_sources({url: down}, sources)
+        code, _, api = self.run_with_sources({url: dict(sources[url]), **healthy}, sources)
         self.assertEqual(code, 0)
         api.assert_not_called()
 
@@ -354,6 +477,7 @@ class NotionTests(unittest.TestCase):
         second = [{'id': '102', 'author': {'id': 'u'}, 'content': 'https://example.com/jobs/102'}]
         with patch.dict(os.environ, {'APPLIED_CHANNEL_ID': 'c'}), \
              patch.object(notion, '_channel_messages', side_effect=[messages, second]) as fetch, \
+             patch.object(notion, 'MAX_APPLIED_LINKS_PER_RUN', 1000), \
              patch.object(notion, '_save'), patch.object(notion, '_ensure_tracker', return_value=False):
             notion._sync_applied(state, 'token', 'parent')
         self.assertEqual(fetch.call_args_list[1].args[2], '101')

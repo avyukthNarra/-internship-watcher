@@ -11,23 +11,27 @@ checkpoints delivery, deduplication, and tracker state for safe retries.
 """
 
 import argparse
+import hashlib
+import json
 import os
 import re
 import smtplib
+import ssl
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
 
-from job_utils import (load_json, save_json, canonical_url, job_identity,
+from job_utils import (load_json, save_json, canonical_url, job_identity, clean_job,
                        fingerprint, term_matches, preference_matches)
 from job_feeds import board_url, feed_items
-from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT,
+from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT, DEFAULT_MAX_DELIVERY_ATTEMPTS,
                             load_personal_webhooks, notifications_enabled, validate_config)
 from source_health import (MAX_STALE_SOURCES, SOURCE_ALERT_AFTER, build_health,
                            health_summary, health_exit_code)
@@ -39,7 +43,12 @@ MSG_MAP_PATH = ROOT / "message_map.json"  # discord message id -> job, for 📌 
 
 SIMPLIFY_URL = (
     "https://raw.githubusercontent.com/SimplifyJobs/"
-    "Summer2026-Internships/dev/.github/scripts/listings.json"
+    "Summer2027-Internships/dev/.github/scripts/listings.json"
+)
+
+VANSHB03_URL = (
+    "https://raw.githubusercontent.com/vanshb03/"
+    "Summer2027-Internships/dev/.github/scripts/listings.json"
 )
 
 HEADERS = {"User-Agent": "internship-watcher/1.0 (personal job alert script)"}
@@ -48,27 +57,48 @@ TIMEOUT = 20
 
 # ---------------------------------------------------------------- utilities
 
+@lru_cache(maxsize=None)
+def _keyword_regex(keywords):
+    """Whole-word match (optional plural s), so "intern" skips "International"
+    and "sales" skips "Salesforce"."""
+    parts = [re.escape(k.strip().lower()) for k in keywords if k.strip()]
+    return re.compile(r"(?<!\w)(?:" + "|".join(parts) + r")s?(?!\w)") if parts else None
+
+
 def matches(title: str, include_kw, exclude_kw) -> bool:
-    t = title.lower()
-    if not any(k.lower() in t for k in include_kw):
+    t = (title or "").lower()
+    include, exclude = _keyword_regex(tuple(include_kw)), _keyword_regex(tuple(exclude_kw))
+    if include is None or not include.search(t):
         return False
-    if any(k.lower() in t for k in exclude_kw):
-        return False
-    return True
+    return exclude is None or not exclude.search(t)
 
 
 SOURCE_HEALTH = {}
 SOURCE_ISSUE_LABEL = "source-down"
+NOT_MODIFIED = object()  # a conditional fetch found the feed unchanged
+CONDITIONAL_FETCH = True  # main() turns this off for dry runs so previews show the full feed
+FULL_FETCH_INTERVAL = 3600  # always refetch in full at least hourly as a safety net
 
 
-def fetch(url, as_text=False):
+def fetch(url, as_text=False, etag=None, track_etag=False):
+    """GET with retries. With `etag`, sends If-None-Match and returns
+    NOT_MODIFIED on HTTP 304. With `track_etag`, the response ETag is kept
+    in the source record for the next run."""
     previous = SOURCE_HEALTH.get(url, {})
+    headers = {**HEADERS, **({"If-None-Match": etag} if etag else {})}
     for attempt in range(3):
         try:
-            r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            r = requests.get(url, headers=headers, timeout=TIMEOUT)
+            if r.status_code == 304 and etag:
+                SOURCE_HEALTH[url] = {**previous, "ok": True, "last_success": time.time()}
+                return NOT_MODIFIED
             if r.status_code == 200:
                 result = r.text if as_text else r.json()
-                SOURCE_HEALTH[url] = {"ok": True, "last_success": time.time()}
+                record = {"ok": True, "last_success": time.time()}
+                new_etag = r.headers.get("ETag") if track_etag else None
+                if isinstance(new_etag, str):
+                    record["etag"] = new_etag
+                SOURCE_HEALTH[url] = record
                 return result
             error = f"HTTP {r.status_code}"
             if r.status_code != 429 and r.status_code < 500:
@@ -82,7 +112,9 @@ def fetch(url, as_text=False):
     return None
 
 
-def get(url):
+def get(url, etag=None, track_etag=False):
+    if etag or track_etag:
+        return fetch(url, etag=etag, track_etag=track_etag)
     return fetch(url)
 
 
@@ -124,9 +156,11 @@ def location_excluded(location: str, patterns) -> bool:
 
 # ------------------------------------------------------------- ATS fetchers
 
-def source_items(url, key=None):
+def source_items(url, key=None, etag=None, track_etag=False):
     previous = dict(SOURCE_HEALTH.get(url, {}))
-    data = get(url)
+    data = get(url, etag=etag, track_etag=track_etag) if (etag or track_etag) else get(url)
+    if data is NOT_MODIFIED:
+        return NOT_MODIFIED
     if data is None:
         return []
     items = feed_items(data, key)
@@ -185,11 +219,36 @@ ATS_FETCHERS = {
 }
 
 
+def _filter_digest(cfg):
+    """Changes whenever a setting that affects which listings match changes,
+    which invalidates the cached ETag."""
+    keys = ("simplify", "include_keywords", "exclude_keywords", "exclude_locations",
+            "terms", "keep_unknown_terms")
+    blob = json.dumps({k: cfg.get(k) for k in keys}, sort_keys=True)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
 def fetch_simplify(cfg):
     """SimplifyJobs aggregated internship list (covers Workday/etc. companies)."""
-    data = source_items(cfg.get("simplify", {}).get("url", SIMPLIFY_URL))
     sim = cfg.get("simplify", {})
+    url = sim.get("url", SIMPLIFY_URL)
+    record = SOURCE_HEALTH.get(url, {})
+    digest = _filter_digest(cfg)
+    cached = (CONDITIONAL_FETCH and record.get("ok") and record.get("etag")
+              and record.get("filter_digest") == digest
+              and time.time() - record.get("full_fetch", 0) < FULL_FETCH_INTERVAL)
+    data = source_items(url, etag=record["etag"] if cached else None, track_etag=CONDITIONAL_FETCH)
+    if data is NOT_MODIFIED:
+        # Nothing changed since a run that already evaluated every listing.
+        return []
+    if SOURCE_HEALTH.get(url, {}).get("ok") and SOURCE_HEALTH[url].get("etag"):
+        SOURCE_HEALTH[url] = {**SOURCE_HEALTH[url], "filter_digest": digest, "full_fetch": time.time()}
     company_filter = [c.lower() for c in sim.get("company_keywords", [])]
+    categories = {c.lower() for c in sim.get("include_categories", [])}
+    category_roles = {name.lower(): _keyword_regex(tuple(words))
+                      for name, words in sim.get("category_roles", {}).items() if words}
+    category_exclude = {name.lower(): _keyword_regex(tuple(words))
+                        for name, words in sim.get("category_exclude", {}).items() if words}
     min_age_days = sim.get("max_age_days", 14)
     cutoff = time.time() - min_age_days * 86400
 
@@ -200,18 +259,59 @@ def fetch_simplify(cfg):
         if j.get("date_posted", 0) < cutoff:
             continue
         company = j.get("company_name", "")
-        if company_filter and not company_matches(company, company_filter):
+        category = j.get("category") or ""
+        by_company = not company_filter or company_matches(company, company_filter)
+        by_category = category.lower() in categories
+        if not (by_company or by_category):
             continue
-        out.append(
-            {
-                "id": f"simplify:{j.get('id')}",
-                "terms": j.get("terms", []),
-                "company": company,
-                "title": j.get("title", ""),
-                "location": ", ".join(j.get("locations", [])[:3]),
-                "url": j.get("url", ""),
-            }
-        )
+        roles = category_roles.get(category.lower())
+        if not by_company and roles and not roles.search(j.get("title", "").lower()):
+            continue  # pulled for its category, but the role is not one you want
+        blocked = category_exclude.get(category.lower())
+        if not by_company and blocked and blocked.search(j.get("title", "").lower()):
+            continue
+        job = {
+            "id": f"simplify:{j.get('id')}",
+            "terms": j.get("terms", []),
+            "company": company,
+            "title": j.get("title", ""),
+            "location": ", ".join(j.get("locations", [])[:3]),
+            "url": j.get("url", ""),
+            "category": category,
+        }
+        if not by_company:
+            job["via_category"] = True  # wanted for its category, not a company you track
+        out.append(job)
+    return out
+
+
+def vanshb03_terms(season, year):
+    """The feed gives a bare season ("Fall"); label it like Simplify does so the
+    season filter and the cross-source fingerprint treat both feeds alike."""
+    names = [w.strip().title() for w in str(season or "").split("/") if w.strip()]
+    return [f"{name} {year - 1 if name == 'Fall' else year}" for name in names]
+
+
+def fetch_vanshb03(cfg):
+    """vanshb03's internship list: same schema family as SimplifyJobs, but a
+    different set of postings. Links are the maintainer's go.vansh.nyc shortlinks."""
+    feed = cfg.get("vanshb03", {})
+    cutoff = time.time() - feed.get("max_age_days", 7) * 86400
+    year = feed.get("year", 2027)
+    out = []
+    for j in source_items(feed.get("url", VANSHB03_URL)):
+        if not j.get("active") or not j.get("is_visible", True):
+            continue
+        if (j.get("date_posted") or 0) < cutoff:
+            continue
+        out.append({
+            "id": f"vanshb03:{j.get('id')}",
+            "terms": vanshb03_terms(j.get("season"), year),
+            "company": j.get("company_name") or "",
+            "title": j.get("title") or "",
+            "location": ", ".join((j.get("locations") or [])[:3]),
+            "url": j.get("url") or "",
+        })
     return out
 
 
@@ -275,7 +375,10 @@ def notify_discord(webhook_url, jobs):
     """Individual messages in every batch; caller checkpoints each success."""
     posted, failed = [], set()
     for j in jobs:
-        content = (f"**{j['company']}** — [{j['title']}]({j['url']})"
+        # Brackets/parens/spaces in untrusted text would break or rewrite the link.
+        title = j["title"].replace("[", "(").replace("]", ")")
+        link = j["url"].replace(")", "%29").replace("(", "%28").replace(" ", "%20")
+        content = (f"**{j['company']}** — [{title}]({link})"
                    + (f" · {j['location']}" if j.get("location") else "")
                    + "\n-# 📌 react to add this to your Notion tracker")
         # Avoid invalid payloads from unusually long feed fields.
@@ -324,7 +427,7 @@ def notify_email(cfg, jobs):
     msg["To"] = to_addr
 
     with smtplib.SMTP(host, port, timeout=30) as s:
-        s.starttls()
+        s.starttls(context=ssl.create_default_context())
         s.login(user, password)
         s.sendmail(user, [to_addr], msg.as_string())
 
@@ -349,13 +452,15 @@ def discover(cfg):
     with ThreadPoolExecutor(max_workers=16) as executor:
         for company, found in executor.map(company_jobs, cfg.get("companies", [])):
             jobs.extend({**j, "company": company["name"]} for j in found)
-    for name, fetcher in (("simplify", fetch_simplify), ("jobright", fetch_jobright)):
+    for name, fetcher in (("simplify", fetch_simplify), ("vanshb03", fetch_vanshb03),
+                           ("jobright", fetch_jobright)):
         if cfg.get(name, {}).get("enabled", name == "simplify"):
             try:
                 jobs.extend({**j, "agg": True} for j in fetcher(cfg))
             except (KeyError, TypeError, ValueError, AttributeError) as exc:
                 SOURCE_HEALTH[name] = {"ok": False, "error": type(exc).__name__}
     terms = cfg.get("terms", cfg.get("simplify", {}).get("terms", []))
+    jobs = [clean_job(j) for j in jobs]
     return [j for j in jobs if matches(j["title"], include, exclude)
             and not location_excluded(j.get("location", ""), cfg.get("exclude_locations", []))
             and term_matches(j, terms, cfg.get("keep_unknown_terms", True))]
@@ -389,7 +494,8 @@ def select_new(jobs, seen, ledger, now, ttl_days=DEFAULT_DEDUP_DAYS):
 def destinations(job, cfg):
     result = []
     top_names = {c["name"].lower() for c in cfg.get("companies", [])}
-    top = (job["id"].split(":", 1)[0] in ("greenhouse", "lever", "ashby", "simplify")
+    top = ((job["id"].split(":", 1)[0] in ("greenhouse", "lever", "ashby", "simplify")
+            and not job.get("via_category"))
            or job["company"].lower() in top_names
            or company_matches(job["company"], cfg.get("simplify", {}).get("company_keywords", [])))
     hook = "DISCORD_WEBHOOK_URL_TOP" if top and os.environ.get("DISCORD_WEBHOOK_URL_TOP") else "DISCORD_WEBHOOK_URL"
@@ -399,7 +505,8 @@ def destinations(job, cfg):
         result.append("email")
     if os.environ.get("NOTION_TOKEN") and os.environ.get("NOTION_PARENT_PAGE_ID"):
         result.append("notion")
-    for preferences in cfg.get("profiles", {}).values():
+    # Personal profiles and shared alert channels route the same way.
+    for preferences in [*cfg.get("profiles", {}).values(), *cfg.get("alert_channels", [])]:
         hook = preferences.get("webhook_env")
         if hook and os.environ.get(hook) and preference_matches(job, preferences):
             result.append("discord:" + hook)
@@ -409,10 +516,13 @@ def destinations(job, cfg):
 def deliver(ledger, cfg, msg_map, checkpoint):
     # Bound work while retaining every undelivered job for the next run.
     budget = cfg.get("max_discord_per_run", DEFAULT_DISCORD_LIMIT)
+    max_attempts = cfg.get("max_delivery_attempts", DEFAULT_MAX_DELIVERY_ATTEMPTS)
+    dead = ledger.setdefault("dead", {})
     for entry in list(ledger.setdefault("pending", {}).values()):
         for destination in list(entry["destinations"]):
             job = entry["job"]
             success = False
+            error = "DeliveryFailed"
             try:
                 if destination.startswith("discord:"):
                     hook = os.environ.get(destination.split(":", 1)[1])
@@ -430,13 +540,25 @@ def deliver(ledger, cfg, msg_map, checkpoint):
                 elif destination == "notion":
                     import notion_sync
                     success = notion_sync.log_master(job)
-            except (requests.RequestException, smtplib.SMTPException, OSError, ValueError, KeyError) as exc:
-                entry["error"] = type(exc).__name__
+            except Exception as exc:
+                # One malformed posting must never stop the jobs queued behind it.
+                error = type(exc).__name__
             if success:
                 entry["destinations"].remove(destination)
                 entry.pop("error", None)
-            else:
-                entry["attempts"] = entry.get("attempts", 0) + 1
+                entry.get("tries", {}).pop(destination, None)
+                continue
+            tries = entry.setdefault("tries", {})
+            tries[destination] = tries.get(destination, 0) + 1
+            entry["attempts"] = entry.get("attempts", 0) + 1
+            entry["error"] = error
+            if max_attempts and tries[destination] >= max_attempts:
+                # Park it: reported in health.json but no longer retried or failing runs.
+                dead[f"{job['id']}|{destination}"] = {
+                    "job": job, "destination": destination, "error": error,
+                    "attempts": tries[destination], "dead_at": time.time()}
+                entry["destinations"].remove(destination)
+                tries.pop(destination, None)
             checkpoint()
     ledger["pending"] = {k: v for k, v in ledger["pending"].items() if v["destinations"]}
     checkpoint()
@@ -539,6 +661,8 @@ def main(argv=None):
     validate_config(cfg)
     load_personal_webhooks()
     dry_run = args.dry_run or not notifications_enabled(cfg)
+    global CONDITIONAL_FETCH
+    CONDITIONAL_FETCH = not dry_run
     ledger_path = ROOT / "delivery_state.json"
     health_path = ROOT / "health.json"
     ledger = load_json(ledger_path, {})
@@ -585,6 +709,7 @@ def main(argv=None):
         current_sources, previous_sources, now=now,
         matching_jobs=len(all_jobs), new_jobs=len(new_jobs),
         pending_deliveries=sum(len(entry["destinations"]) for entry in ledger["pending"].values()),
+        dead_deliveries=len(ledger.get("dead", {})),
         sync_error=sync_error,
     )
     track_source_issues(health, previous_sources, cfg)

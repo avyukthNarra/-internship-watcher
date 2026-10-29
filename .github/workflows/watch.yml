@@ -59,6 +59,7 @@ jobs:
         run: |
           git config user.name "internship-watcher-bot"
           git config user.email "actions@github.com"
+          python trim_health_noise.py || true   # skip commits that only change timestamps/counts
           for f in seen.json message_map.json notion_state.json delivery_state.json health.json; do
             git add "$f" 2>/dev/null || true
           done
