@@ -6,7 +6,7 @@ This repository monitors internship postings and routes matching jobs to Discord
 
 Each watcher run:
 
-1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs and Jobright feeds.
+1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs, vanshb03, and Jobright feeds. The vanshb03 feed (`vanshb03` in `config.json`, with `max_age_days` and `year`) is a separate list of internships whose links are the maintainer's `go.vansh.nyc` shortlinks; cross-feed duplicates are caught by the company, title, location, and season fingerprint, not by URL.
 2. Applies the title, location, and season filters to every source. The top-level `terms` list applies to all sources; `simplify.terms` remains a backward-compatible fallback only when top-level `terms` is absent. `keep_unknown_terms` controls whether a posting with no recognizable season term is retained and defaults to keeping unknown terms.
 3. Identifies postings by ATS identity or canonical URL. Known campaign parameters are removed, while other URL query parameters are preserved because they may identify the job. Exact identities remain known indefinitely. Cross-source fuzzy fingerprints are retained for `dedup_days` (30 days by default). Legacy `norm:` entries in state are ignored for matching and are not removed.
 4. Places each new job into `delivery_state.json` with its individual destinations. Discord notifications are individual posts and retain the 📌 instruction. There are no digest messages. `max_discord_per_run` defaults to 50; undelivered destinations remain queued for a later run.
@@ -81,7 +81,46 @@ With no delivery credentials, or with `python watcher.py --dry-run`, the watcher
 
 `config.json` contains the `companies` entries plus explicit defaults for `terms`, `keep_unknown_terms`, `dedup_days` (30), `max_discord_per_run` (50), `follow_up_days` (14), and `profiles` (an empty object unless configured). It also contains the SimplifyJobs and Jobright feed settings. Add a board only after verifying its slug with `verify_boards.py`; unsupported or stale slugs can return 404. The configured `exclude_locations` list uses word-boundary matching and keeps locations that clearly contain a US state or USA. Empty or unknown locations are retained.
 
+To find boards you don't track yet, `discover_boards.py` tries likely Greenhouse, Lever, and Ashby slugs for a list of company names (`--names file.txt`) or for the open Y Combinator list of companies that are hiring (`--yc --min-team 10`). It prints boards with matching internship postings for you to review and never edits `config.json`; verify each pick with `verify_boards.py --candidate ATS BOARD` before adding it. A board listed under `[NAME DIFFERS - check]` may belong to a different company with a similar name.
+
 Wayve is fetched directly from its Ashby board. Postman moved to Workday, which the watcher does not fetch directly; it is included in the SimplifyJobs company filter and remains eligible for Jobright routing. Postman alerts depend on those feeds publishing matching jobs within the configured age window.
+
+### Alert channels
+
+The shipped config has role channels (`swe`, `data`, `research`, `ml`, `embedded`, `hardware`, `quant`). Embedded and firmware titles go to `embedded` only; other hardware goes to `hardware`; `swe` skips embedded titles. A title that fits two roles (for example "Machine Learning Software Intern") posts in both. They stay inactive until `DISCORD_WEBHOOK_SWE`, `_DATA`, `_RESEARCH`, `_ML`, `_EMBEDDED`, `_HARDWARE`, and `_QUANT` are added to `PERSONAL_WEBHOOKS_JSON`.
+
+To get pings for specific companies, add a shared watchlist entry and have people follow that Discord channel:
+
+```json
+{"name": "watchlist", "webhook_env": "DISCORD_WEBHOOK_WATCHLIST", "companies": ["Nvidia", "Jane Street"]}
+```
+
+Company names match as whole words in any case, so `Nvidia` also matches "NVIDIA Corp". Add or remove names in `config.json`; matching jobs post as they drop.
+
+`alert_channels` (optional list) posts matching jobs into extra Discord channels, in addition to the normal channel. Each entry has a `name`, a `webhook_env`, and any of `roles`, `exclude_roles`, `companies`, `locations`, `terms`, `categories`, `keep_unknown_terms`; empty or missing lists impose no restriction, but an entry must set at least one of `roles`, `companies`, `locations`, `terms`, `categories` (otherwise it would repeat every job). `exclude_roles` rejects titles containing any listed word. Several entries may share one `webhook_env`; a job that matches more than one still posts there once. People opt in by turning on notifications for the channels they care about, so no per-person setup is needed.
+
+```json
+{
+  "alert_channels": [
+    {"name": "quant", "webhook_env": "DISCORD_WEBHOOK_QUANT",
+     "companies": ["Jane Street", "Citadel", "Two Sigma"]},
+    {"name": "ml-nyc", "webhook_env": "DISCORD_WEBHOOK_MLNYC",
+     "roles": ["machine learning", "ml"], "locations": ["New York"], "terms": ["Summer 2027"]}
+  ]
+}
+```
+
+`simplify.category_exclude` (a map of category to keywords) drops category-only pulls whose title contains an unwanted word, for example `"Hardware": ["materials", "technician"]`, and `simplify.category_roles` does the reverse, keeping only titles that contain one of the listed words. Both apply only to postings pulled because of their category, never to companies you track, and are matched as whole words.
+
+A SimplifyJobs term of `N/A` (and `TBD`, `unknown`, `none`) is treated as an unknown season, so `keep_unknown_terms` decides whether those postings are kept. Previously `N/A` was mistaken for a season that never matched, which silently hid those postings.
+
+Channels (and profiles) can also match on `categories`, the SimplifyJobs category of a posting (for example `Hardware`, `Quant`, `Software`, `AI/ML/Data`, `Product`). Only SimplifyJobs postings carry a category.
+
+`simplify.include_categories` pulls every SimplifyJobs posting in those categories regardless of company, still subject to the title, location, and season filters. Such postings go to the general channel and any matching alert channel, but not the TOP channel unless the company is one you track. The shipped config pulls `Hardware` and `Quant` and defines `hardware` and `quant` alert channels; those channels stay inactive until you add `DISCORD_WEBHOOK_HARDWARE` and `DISCORD_WEBHOOK_QUANT` to `PERSONAL_WEBHOOKS_JSON`.
+
+Add each channel's webhook URL to the `PERSONAL_WEBHOOKS_JSON` secret under the same name (for example `{"DISCORD_WEBHOOK_QUANT": "https://discord.com/api/webhooks/REDACTED"}`); no workflow change is needed. A channel whose webhook is not set is skipped.
+
+`allowed_user_ids` (optional list of Discord user IDs) restricts who the bot serves. When it is set, 📌 reactions and applied-channel links from anyone else are ignored; when it is absent or empty, everyone is served. Applied-channel intake is also bounded: at most 5 links per message (extras get a ⚠️ reaction) and 20 links read per run, with the rest picked up on later runs.
 
 For profiles, use Discord user IDs as keys, for example:
 
@@ -115,9 +154,9 @@ These files are runtime state. GitHub Actions persists them after each run; loca
 | `delivery_state.json` | Known identities, 30-day fingerprints, legacy `norm:` entries ignored but retained, and pending per-destination queues |
 | `message_map.json` | Recent Discord message IDs and jobs used for 📌 scans |
 | `notion_state.json` | Notion database IDs, users, applied cursor, `pending_applied`, and `pending_pins` |
-| `health.json` | Last completed scan, source successes/failures, matching and new counts, pending deliveries, and sync errors |
+| `health.json` | Last completed scan, source successes/failures, matching and new counts, pending deliveries, parked (given-up) deliveries, sync errors, and the SimplifyJobs ETag cache (an unchanged feed is skipped via HTTP 304, refetched in full at least hourly and whenever filter settings change) |
 
-`health.json` is also the run's operational summary: a source failure, pending delivery, or Notion sync error is reported explicitly and retried through durable state. A failing source records `failing_since` and only fails the run (and triggers failure alerts) once it has been down for 5 hours; pending deliveries and sync errors fail the run immediately.
+`health.json` is also the run's operational summary: a source failure, pending delivery, or Notion sync error is reported explicitly and retried through durable state. A failing source records `failing_since`. Once it has been down for 5 hours the watcher opens a `source-down` GitHub issue (closed automatically on recovery) and dispatches the `source-doctor.yml` workflow, where Claude investigates and opens a PR updating `config.json`; the run itself still succeeds. A broad outage (more than 5 stale sources, or 10% of sources), pending deliveries, and sync errors fail the run. The source doctor needs a `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or `ANTHROPIC_API_KEY` repository secret.
 
 ## Local run
 

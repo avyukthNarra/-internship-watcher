@@ -7,6 +7,7 @@ from job_feeds import BOARD_APIS
 
 DEFAULT_DISCORD_LIMIT = 50
 DEFAULT_DEDUP_DAYS = 30
+DEFAULT_MAX_DELIVERY_ATTEMPTS = 20  # about 3 hours of 10-minute runs; 0 disables
 DEFAULT_FOLLOW_UP_DAYS = 14
 
 
@@ -39,17 +40,26 @@ def validate_config(cfg):
             raise ValueError("Every company needs name, ats, and board strings")
         if company["ats"] not in BOARD_APIS:
             raise ValueError("Unsupported ATS: " + company["ats"])
-    _non_negative_integers(cfg, ("max_discord_per_run", "dedup_days", "follow_up_days"))
-    _string_lists(cfg, ("terms", "include_keywords", "exclude_keywords", "exclude_locations"))
+    _non_negative_integers(cfg, ("max_discord_per_run", "dedup_days", "follow_up_days",
+                               "max_delivery_attempts"))
+    _string_lists(cfg, ("terms", "include_keywords", "exclude_keywords", "exclude_locations",
+                          "allowed_user_ids"))
     _booleans(cfg, ("keep_unknown_terms",))
 
-    for name, list_keys in (("simplify", ("terms", "company_keywords")),
+    for name, list_keys in (("simplify", ("terms", "company_keywords", "include_categories")),
+                            ("vanshb03", ()),
                             ("jobright", ("repos",))):
         feed = cfg.get(name, {})
         if not isinstance(feed, dict):
             raise ValueError(name + " must be an object")
         _string_lists(feed, list_keys, name + ".")
-        _non_negative_integers(feed, ("max_age_days",), name + ".")
+        for option in ("category_roles", "category_exclude"):
+            if option in feed:
+                if not isinstance(feed[option], dict):
+                    raise ValueError(f"{name}.{option} must map category names to keyword lists")
+                for category, words in feed[option].items():
+                    _string_lists({category: words}, (category,), f"{name}.{option}.")
+        _non_negative_integers(feed, ("max_age_days", "year"), name + ".")
         _booleans(feed, ("enabled",), name + ".")
         if "url" in feed and not isinstance(feed["url"], str):
             raise ValueError(name + ".url must be a string")
@@ -60,12 +70,34 @@ def validate_config(cfg):
     for profile in profiles.values():
         if not isinstance(profile, dict):
             raise ValueError("Each profile must be an object")
-        _string_lists(profile, ("roles", "companies", "locations", "terms"), "Profile ")
+        _string_lists(profile, ("roles", "exclude_roles", "companies", "locations", "terms", "categories"),
+                      "Profile ")
         _non_negative_integers(profile, ("follow_up_days",), "Profile ")
         _booleans(profile, ("keep_unknown_terms",), "Profile ")
         if "webhook_env" in profile and (not isinstance(profile["webhook_env"], str)
                                          or not profile["webhook_env"].startswith("DISCORD_WEBHOOK_")):
             raise ValueError("Profile webhook_env must begin DISCORD_WEBHOOK_")
+    _validate_alert_channels(cfg.get("alert_channels", []))
+
+
+def _validate_alert_channels(channels):
+    if not isinstance(channels, list):
+        raise ValueError("alert_channels must be a list")
+    for channel in channels:
+        if not isinstance(channel, dict):
+            raise ValueError("Each alert channel must be an object")
+        if not isinstance(channel.get("name"), str) or not channel["name"]:
+            raise ValueError("Each alert channel needs a name")
+        if not isinstance(channel.get("webhook_env"), str) \
+                or not channel["webhook_env"].startswith("DISCORD_WEBHOOK_"):
+            raise ValueError("Alert channel webhook_env must begin DISCORD_WEBHOOK_")
+        _string_lists(channel, ("roles", "exclude_roles", "companies", "locations", "terms",
+                                "categories"), "Alert channel ")
+        if not any(channel.get(key) for key in ("roles", "companies", "locations", "terms",
+                                                "categories")):
+            raise ValueError(f"Alert channel {channel['name']} needs roles, companies, locations, "
+                             "terms, or categories; with none it would repeat every job")
+        _booleans(channel, ("keep_unknown_terms",), "Alert channel ")
 
 
 def load_personal_webhooks(environ=None):
@@ -88,7 +120,7 @@ def notifications_enabled(cfg, environ=None):
         or (environ.get("SMTP_USER") and environ.get("SMTP_PASS"))
         or (environ.get("NOTION_TOKEN") and environ.get("NOTION_PARENT_PAGE_ID"))
         or any(environ.get(profile.get("webhook_env", ""))
-               for profile in cfg.get("profiles", {}).values())
+               for profile in [*cfg.get("profiles", {}).values(), *cfg.get("alert_channels", [])])
     )
 
 
