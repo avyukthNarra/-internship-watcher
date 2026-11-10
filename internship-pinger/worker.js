@@ -96,7 +96,7 @@ async function deliverAlert(env, content) {
     const response = await fetch(env.DISCORD_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
       signal: timeoutSignal(),
     });
     if (!response.ok) {

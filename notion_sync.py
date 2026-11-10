@@ -36,6 +36,7 @@ from pathlib import Path
 import requests
 
 from job_utils import canonical_url, job_identity, load_json, save_json
+from net_safety import host_is, safe_get_text
 from project_config import DEFAULT_FOLLOW_UP_DAYS, follow_up_days
 
 _PAGE_CACHE = {}
@@ -65,6 +66,14 @@ STATUS_OPTIONS = [
 ]
 
 DEAD_SWEEP_INTERVAL = 24 * 3600  # re-check Saved rows once a day
+MAX_LINKS_PER_MESSAGE = 5
+MAX_APPLIED_LINKS_PER_RUN = 20  # bounds outbound fetches a link spammer can trigger
+
+
+def _allowed(cfg, user_id):
+    """allowed_user_ids restricts who may use the bot; unset or empty allows everyone."""
+    allowed = (cfg or {}).get("allowed_user_ids")
+    return not allowed or user_id in allowed
 
 
 def _notion_headers():
@@ -308,6 +317,10 @@ _PATH_SLUG_HOSTS = ("greenhouse.io", "lever.co", "ashbyhq.com",
 _UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 
+def _q(part):
+    return urllib.parse.quote(part, safe="")
+
+
 def _humanize(slug):
     """creditkarma -> Creditkarma, ExpediaGroup -> Expedia Group,
     al-warren-oil -> Al Warren Oil."""
@@ -351,10 +364,10 @@ def _company_from_url(url):
     parsed = urllib.parse.urlparse(url)
     host = parsed.hostname or ""
     parts = [p for p in parsed.path.split("/") if p]
-    if host.endswith("myworkdayjobs.com"):
+    if host_is(host, "myworkdayjobs.com"):
         return _humanize(host.split(".")[0])             # tenant subdomain
     for dom in _PATH_SLUG_HOSTS:
-        if host.endswith(dom) and parts:
+        if host_is(host, dom) and parts:
             return _humanize(parts[0])
     labels = host.split(".")
     if len(labels) >= 2 and labels[-2] not in _BRAND_DOMAINS:
@@ -378,7 +391,7 @@ def _ats_api(url):
     uuid = next((s for s in parts if _UUID_RE.fullmatch(s)), None)
     q = urllib.parse.parse_qs(p.query)
     try:
-        if host.endswith("greenhouse.io") and parts:
+        if host_is(host, "greenhouse.io") and parts:
             board, jid = parts[0], None
             if "jobs" in parts:
                 i = parts.index("jobs")
@@ -387,30 +400,30 @@ def _ats_api(url):
             # The board endpoint carries the clean company name (og:title on the
             # page is the company on some boards but the role on others, so it
             # can't be trusted); the job endpoint carries role + location.
-            bn = _json(f"https://boards-api.greenhouse.io/v1/boards/{board}")
+            bn = _json(f"https://boards-api.greenhouse.io/v1/boards/{_q(board)}")
             company = bn.get("name") if bn else None
             role = location = None
             if jid:
-                d = _json(f"https://boards-api.greenhouse.io/v1/boards/{board}"
-                          f"/jobs/{jid}")
+                d = _json(f"https://boards-api.greenhouse.io/v1/boards/{_q(board)}"
+                          f"/jobs/{_q(jid)}")
                 if d:
                     role = d.get("title")
                     location = (d.get("location") or {}).get("name", "")
             if company or role:
                 return {"company": company, "role": role,
                         "location": location or ""}
-        elif host.endswith("lever.co") and parts and uuid:
-            d = _json(f"https://api.lever.co/v0/postings/{parts[0]}/{uuid}")
+        elif host_is(host, "lever.co") and parts and uuid:
+            d = _json(f"https://api.lever.co/v0/postings/{_q(parts[0])}/{uuid}")
             if d:
                 return {"company": None, "role": d.get("text"),
                         "location": (d.get("categories") or {}).get("location", "")}
-        elif host.endswith("ashbyhq.com") and parts and uuid:
-            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{parts[0]}")
+        elif host_is(host, "ashbyhq.com") and parts and uuid:
+            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{_q(parts[0])}")
             for j in (d or {}).get("jobs", []):
                 if j.get("id") == uuid:
                     return {"company": None, "role": j.get("title"),
                             "location": j.get("location", "")}
-        elif host.endswith("smartrecruiters.com") and parts:
+        elif host_is(host, "smartrecruiters.com") and parts:
             cid = None
             if "company" in parts:
                 i = parts.index("company")
@@ -418,8 +431,8 @@ def _ats_api(url):
             cid = cid or q.get("dcr_ci", [None])[0] or parts[0]
             pid = uuid or next((s for s in reversed(parts) if s.isdigit()), None)
             if cid and pid:
-                d = _json(f"https://api.smartrecruiters.com/v1/companies/{cid}"
-                          f"/postings/{pid}")
+                d = _json(f"https://api.smartrecruiters.com/v1/companies/{_q(cid)}"
+                          f"/postings/{_q(pid)}")
                 if d:
                     loc = d.get("location") or {}
                     loc_s = ", ".join(x for x in (loc.get("city"),
@@ -452,14 +465,14 @@ def _parse_job_from_url(url):
     """
     og_title = og_site = title_tag = None
     try:
-        r = requests.get(
-            url, headers={"User-Agent":
-                          "internship-watcher/1.0 (+notion applied sync)"},
+        fetched = safe_get_text(
+            url, headers={"User-Agent": "internship-watcher/1.0 (+notion applied sync)"},
             timeout=20)
-        if r.status_code == 200:
-            og_title = _meta(r.text, "og:title")
-            og_site = _meta(r.text, "og:site_name")
-            m = re.search(r"<title[^>]*>(.*?)</title>", r.text,
+        if fetched and fetched[0] == 200:
+            page = fetched[1]
+            og_title = _meta(page, "og:title")
+            og_site = _meta(page, "og:site_name")
+            m = re.search(r"<title[^>]*>(.*?)</title>", page,
                           re.IGNORECASE | re.DOTALL)
             title_tag = html.unescape(m.group(1)).strip() if m else None
     except requests.exceptions.RequestException:
@@ -592,27 +605,38 @@ def _remember_page(user, job, page):
     user.setdefault("pages", {})[job_identity(job)] = page["id"]
 
 
-def _collect_applied(state, bot_token, channel_id):
-    """Queue every link before checkpointing the channel's next message cursor."""
+def _collect_applied(state, bot_token, channel_id, cfg=None):
+    """Queue every link before checkpointing the channel's next message cursor.
+    A message with more than MAX_LINKS_PER_MESSAGE links is truncated with a
+    warning reaction. Once MAX_APPLIED_LINKS_PER_RUN links are queued, reading
+    stops and the cursor stays put, so the rest is handled next run."""
     pending = state.setdefault("pending_applied", {})
+    queued = 0
     for _ in range(10):
         msgs = _channel_messages(bot_token, channel_id, state["applied_after"])
         if not msgs:
             break
+        cursor = None
         for m in sorted(msgs, key=lambda m: int(m["id"])):
+            if queued >= MAX_APPLIED_LINKS_PER_RUN:
+                break
+            cursor = m["id"]
             author = m.get("author", {})
-            if not author.get("bot"):
-                urls = list(dict.fromkeys(match.group(0).rstrip(").,]")
-                                          for match in URL_RE.finditer(m.get("content", ""))))
-                if not urls:
-                    _react(bot_token, channel_id, m["id"], WARN_EMOJI)
-                for index, url in enumerate(urls):
-                    pending.setdefault(f"{m['id']}:{index}", {
-                        "mid": m["id"], "uid": author["id"], "url": canonical_url(url),
-                        "name": _display_name(author)})
-        state["applied_after"] = str(max(int(m["id"]) for m in msgs))
+            if author.get("bot") or not _allowed(cfg, author.get("id")):
+                continue
+            urls = list(dict.fromkeys(match.group(0).rstrip(").,]")
+                                      for match in URL_RE.finditer(m.get("content", ""))))
+            if not urls or len(urls) > MAX_LINKS_PER_MESSAGE:
+                _react(bot_token, channel_id, m["id"], WARN_EMOJI)
+            for index, url in enumerate(urls[:MAX_LINKS_PER_MESSAGE]):
+                pending.setdefault(f"{m['id']}:{index}", {
+                    "mid": m["id"], "uid": author["id"], "url": canonical_url(url),
+                    "name": _display_name(author)})
+            queued += min(len(urls), MAX_LINKS_PER_MESSAGE)
+        if cursor:
+            state["applied_after"] = cursor
         _save(state)
-        if len(msgs) < 100:
+        if len(msgs) < 100 or queued >= MAX_APPLIED_LINKS_PER_RUN:
             break
 
 
@@ -651,7 +675,7 @@ def _sync_applied(state, bot_token, parent, cfg=None):
         state["applied_after"] = _snowflake_now()
         _save(state)
         return True
-    _collect_applied(state, bot_token, channel_id)
+    _collect_applied(state, bot_token, channel_id, cfg)
     _deliver_applied(state, bot_token, channel_id, parent, cfg or {})
     return True
 
@@ -665,6 +689,8 @@ def _sync_pins(state, bot_token, parent, cfg):
             rec = msg_map[mid]
             for user in _pin_reactors(bot_token, rec["cid"], mid):
                 uid = user["id"]
+                if not _allowed(cfg, uid):
+                    continue
                 u = _tracker_user(state, uid, _display_name(user))
                 if rec["job"]["id"] not in u["jobs"]:
                     pending.setdefault(uid + ":" + rec["job"]["id"], {
@@ -711,7 +737,7 @@ def _posting_open(url, company=None, boards=None):
     try:
         jid = q.get("gh_jid", [None])[0]
         board = None
-        if host.endswith("greenhouse.io") and parts:
+        if host_is(host, "greenhouse.io") and parts:
             board = parts[0]
             if not jid and "jobs" in parts:
                 i = parts.index("jobs")
@@ -722,14 +748,14 @@ def _posting_open(url, company=None, boards=None):
                 board = slug
         if board and jid:
             r = requests.get(f"https://boards-api.greenhouse.io/v1/boards/"
-                             f"{board}/jobs/{jid}", timeout=15)
+                             f"{_q(board)}/jobs/{_q(jid)}", timeout=15)
             return {200: True, 404: False}.get(r.status_code)
-        if host.endswith("lever.co") and parts and uuid:
-            r = requests.get(f"https://api.lever.co/v0/postings/{parts[0]}"
+        if host_is(host, "lever.co") and parts and uuid:
+            r = requests.get(f"https://api.lever.co/v0/postings/{_q(parts[0])}"
                              f"/{uuid}", timeout=15)
             return {200: True, 404: False}.get(r.status_code)
-        if host.endswith("ashbyhq.com") and parts and uuid:
-            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{parts[0]}")
+        if host_is(host, "ashbyhq.com") and parts and uuid:
+            d = _json(f"https://api.ashbyhq.com/posting-api/job-board/{_q(parts[0])}")
             if d is None:
                 return None
             return any(j.get("id") == uuid for j in d.get("jobs", []))
