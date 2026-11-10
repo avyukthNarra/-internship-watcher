@@ -46,7 +46,7 @@ jobs:
 
       # Issues opened with GITHUB_TOKEN don't trigger workflows, so dispatch explicitly.
       - name: Dispatch source doctor
-        if: always() && steps.watcher.outputs.source_issues
+        if: always() && vars.SOURCE_DOCTOR_ENABLED == 'true' && steps.watcher.outputs.source_issues
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

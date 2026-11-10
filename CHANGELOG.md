@@ -26,7 +26,7 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 - Keyword matching is whole-word, so "intern" no longer matches "International".
 - `N/A`, `TBD`, `unknown`, and `none` seasons are treated as unknown (`keep_unknown_terms` decides).
 - A single stale source no longer fails the run; only broad outages (more than 5 stale sources, or 10% of sources), stuck deliveries, or sync errors do.
-- A source down 5h+ opens a `source-down` GitHub issue, closed on recovery or removal, and dispatches `source-doctor.yml` to investigate.
+- A source down 5h+ opens a `source-down` GitHub issue, closed on recovery or removal, and can dispatch `source-doctor.yml` to investigate when `SOURCE_DOCTOR_ENABLED` is set.
 - Old Mission Capital moved to its Ashby board.
 - New `exclude_keywords`: civil engineering, chemical, chemistry, structural, geotechnical, hvac, welding.
 - Expect a one-time burst of about 350 alerts on the first run after merge.

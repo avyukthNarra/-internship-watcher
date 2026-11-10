@@ -24,7 +24,8 @@ concurrency:
 
 jobs:
   investigate:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'source-down'
+    # Off until main can be protected; set the repo variable SOURCE_DOCTOR_ENABLED to true to enable.
+    if: vars.SOURCE_DOCTOR_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.label.name == 'source-down')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
