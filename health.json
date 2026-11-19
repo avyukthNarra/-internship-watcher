@@ -1,48 +1,48 @@
 {
- "failed_sources": 3,
- "last_completed_scan": 1795110080.9913695,
- "matching_jobs": 632,
+ "failed_sources": 4,
+ "last_completed_scan": 1795110731.3774595,
+ "matching_jobs": 586,
  "new_jobs": 0,
  "pending_deliveries": 0,
  "sources": {
   "https://api.ashbyhq.com/posting-api/job-board/1password": {
-   "last_success": 1795110064.5648634,
+   "last_success": 1795110667.8193984,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/abridge": {
-   "last_success": 1795110064.3822246,
+   "last_success": 1795110667.6214416,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/ambiencehealthcare": {
-   "last_success": 1795110064.8153124,
+   "last_success": 1795110668.0649123,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/anyscale": {
-   "last_success": 1795110064.3436859,
+   "last_success": 1795110667.608198,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/artisan": {
-   "last_success": 1795110064.810714,
+   "last_success": 1795110668.0612793,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/aurora-operations-inc": {
-   "last_success": 1795110063.8962646,
+   "last_success": 1795110667.0824678,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/baseten": {
-   "last_success": 1795110064.293897,
+   "last_success": 1795110667.4757109,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/benchling": {
-   "last_success": 1795110064.3982685,
+   "last_success": 1795110667.6805162,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/black-forest-labs": {
-   "last_success": 1795110064.64614,
+   "last_success": 1795110667.9649951,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/braintrust": {
-   "last_success": 1795110064.807608,
+   "last_success": 1795110668.0707078,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/browserbase": {
@@ -52,243 +52,243 @@
    "ok": false
   },
   "https://api.ashbyhq.com/posting-api/job-board/cartesia": {
-   "last_success": 1795110064.8192859,
+   "last_success": 1795110668.0778244,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/cerebras": {
-   "last_success": 1795110063.8842003,
+   "last_success": 1795110667.1038787,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/character": {
-   "last_success": 1795110064.025354,
+   "last_success": 1795110667.2009761,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/cognition": {
-   "last_success": 1795110064.455551,
+   "last_success": 1795110667.598838,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/cohere": {
-   "last_success": 1795110064.0679364,
+   "last_success": 1795110667.2856474,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/cursor": {
-   "last_success": 1795110064.1034238,
+   "last_success": 1795110667.235505,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/decagon": {
-   "last_success": 1795110064.2735534,
+   "last_success": 1795110667.43875,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/deel": {
-   "last_success": 1795110064.1678755,
+   "last_success": 1795110667.3852844,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/deepgram": {
-   "last_success": 1795110064.4719539,
+   "last_success": 1795110667.6729598,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/distyl": {
-   "last_success": 1795110064.9211793,
+   "last_success": 1795110668.2835815,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/docker": {
-   "last_success": 1795110064.4824195,
+   "last_success": 1795110667.692239,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/dust": {
-   "last_success": 1795110064.8524528,
+   "last_success": 1795110668.1094563,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/elevenlabs": {
-   "last_success": 1795110064.0487747,
+   "last_success": 1795110667.2857654,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/etched": {
-   "last_success": 1795110064.9349904,
+   "last_success": 1795110668.1775792,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/fireworks": {
-   "last_success": 1795110064.3228176,
+   "last_success": 1795110667.5299594,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/harvey": {
-   "last_success": 1795110064.5266883,
+   "last_success": 1795110667.6541154,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/ideogram": {
-   "last_success": 1795110064.8706546,
+   "last_success": 1795110668.18577,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/krea": {
-   "last_success": 1795110064.8669837,
+   "last_success": 1795110668.2052746,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/lambda": {
-   "last_success": 1795110064.5021615,
+   "last_success": 1795110667.7195313,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/langchain": {
-   "last_success": 1795110064.23776,
+   "last_success": 1795110667.3418293,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/linear": {
-   "last_success": 1795110064.0827796,
+   "last_success": 1795110667.2473776,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/liquid": {
-   "last_success": 1795110064.9491072,
+   "last_success": 1795110668.2610095,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/lovable": {
-   "last_success": 1795110064.417889,
+   "last_success": 1795110667.6147246,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/mercor": {
-   "last_success": 1795110064.3094034,
+   "last_success": 1795110667.4885335,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/modal": {
-   "last_success": 1795110064.0886683,
+   "last_success": 1795110667.2141957,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/notion": {
-   "last_success": 1795110064.1890197,
+   "last_success": 1795110667.3732593,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/openai": {
-   "last_success": 1795110064.729273,
+   "last_success": 1795110667.7700677,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/openevidence": {
-   "last_success": 1795110064.2449389,
+   "last_success": 1795110667.4625328,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/perplexity": {
-   "last_success": 1795110064.113571,
+   "last_success": 1795110667.3136458,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/physicalintelligence": {
-   "last_success": 1795110064.300238,
+   "last_success": 1795110667.5672405,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/pika": {
-   "last_success": 1795110064.882289,
+   "last_success": 1795110668.1342885,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/pinecone": {
-   "last_success": 1795110064.3886886,
+   "last_success": 1795110667.6298044,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/plaid": {
-   "last_success": 1795110064.582592,
+   "last_success": 1795110667.8320665,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/poolside": {
-   "last_success": 1795110064.861875,
+   "last_success": 1795110668.1318593,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/posthog": {
-   "last_success": 1795110065.163237,
+   "last_success": 1795110668.4115891,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/quora": {
-   "last_success": 1795110065.1372993,
+   "last_success": 1795110668.4406462,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/railway": {
-   "last_success": 1795110065.1389775,
+   "last_success": 1795110668.415829,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/ramp": {
-   "last_success": 1795110064.167041,
+   "last_success": 1795110667.4116414,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/reka": {
-   "last_success": 1795110064.8645763,
+   "last_success": 1795110668.1368146,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/render": {
-   "last_success": 1795110065.1546218,
+   "last_success": 1795110668.450939,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/replit": {
-   "last_success": 1795110064.9406028,
+   "last_success": 1795110668.243461,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/runway": {
-   "last_success": 1795110064.953688,
+   "last_success": 1795110668.2378304,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/saronic": {
-   "last_success": 1795110065.0888548,
+   "last_success": 1795110668.3802822,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/sierra": {
-   "last_success": 1795110064.4438982,
+   "last_success": 1795110667.5521965,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/skydio": {
-   "last_success": 1795110064.6014748,
+   "last_success": 1795110667.8474214,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/snowflake": {
-   "last_success": 1795110064.3768315,
+   "last_success": 1795110667.5166554,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/suno": {
-   "last_success": 1795110064.2579124,
+   "last_success": 1795110667.4504647,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/supabase": {
-   "last_success": 1795110064.1248827,
+   "last_success": 1795110667.2971478,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/synthesia": {
-   "last_success": 1795110064.911338,
+   "last_success": 1795110668.1691685,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/tavus": {
-   "last_success": 1795110064.8981988,
+   "last_success": 1795110668.1817856,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/temporal": {
-   "last_success": 1795110065.1172469,
+   "last_success": 1795110668.4325936,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/trychroma": {
-   "last_success": 1795110064.8223195,
+   "last_success": 1795110668.1285186,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/vanta": {
-   "last_success": 1795110064.2494626,
+   "last_success": 1795110667.564246,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/vapi": {
-   "last_success": 1795110064.9021175,
+   "last_success": 1795110668.189462,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/voleon": {
-   "last_success": 1795110064.9603665,
+   "last_success": 1795110668.2740846,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/wayve": {
-   "last_success": 1795110064.7880883,
+   "last_success": 1795110668.0004923,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/weaviate": {
-   "last_success": 1795110064.90515,
+   "last_success": 1795110668.1874752,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/worldlabs": {
-   "last_success": 1795110064.7459795,
+   "last_success": 1795110667.9616978,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/writer": {
-   "last_success": 1795110064.926167,
+   "last_success": 1795110668.211499,
    "ok": true
   },
   "https://api.ashbyhq.com/posting-api/job-board/zip": {
-   "last_success": 1795110064.40766,
+   "last_success": 1795110667.5852249,
    "ok": true
   },
   "https://api.lever.co/v0/postings/mistral?mode=json": {
@@ -298,259 +298,261 @@
    "ok": false
   },
   "https://api.lever.co/v0/postings/palantir?mode=json": {
-   "last_success": 1795110065.8329096,
+   "last_success": 1795110668.30821,
    "ok": true
   },
   "https://api.lever.co/v0/postings/shieldai?mode=json": {
-   "last_success": 1795110065.2608576,
+   "last_success": 1795110667.8649719,
    "ok": true
   },
   "https://api.lever.co/v0/postings/spotify?mode=json": {
-   "last_success": 1795110066.1878364,
+   "last_success": 1795110698.4344518,
    "ok": true
   },
   "https://api.lever.co/v0/postings/swordhealth?mode=json": {
-   "last_success": 1795110065.2036319,
+   "last_success": 1795110676.8379674,
    "ok": true
   },
   "https://api.lever.co/v0/postings/zoox?mode=json": {
-   "last_success": 1795110065.3405027,
+   "last_success": 1795110668.257636,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/adyen/jobs": {
-   "last_success": 1795110065.0260947,
+   "last_success": 1795110668.2781227,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/affirm/jobs": {
-   "last_success": 1795110063.7611191,
+   "last_success": 1795110666.9478924,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/airbnb/jobs": {
-   "last_success": 1795110063.5204694,
+   "last_success": 1795110666.769235,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/airtable/jobs": {
-   "last_success": 1795110063.7532833,
+   "last_success": 1795110666.9798262,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/akunacapital/jobs": {
-   "last_success": 1795110063.9261343,
+   "last_success": 1795110667.1245294,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/andurilindustries/jobs": {
+   "error": "ReadTimeout",
+   "failing_since": 1795110731.3774595,
    "last_success": 1795110080.5433984,
-   "ok": true
+   "ok": false
   },
   "https://boards-api.greenhouse.io/v1/boards/anthropic/jobs": {
-   "last_success": 1795110063.5598142,
+   "last_success": 1795110666.7355113,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/apptronik/jobs": {
-   "last_success": 1795110064.5316622,
+   "last_success": 1795110667.7809217,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/arizeai/jobs": {
-   "last_success": 1795110064.5372996,
+   "last_success": 1795110667.7783422,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/asana/jobs": {
-   "last_success": 1795110063.6138518,
+   "last_success": 1795110666.8575566,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/assemblyai/jobs": {
-   "last_success": 1795110063.835434,
+   "last_success": 1795110667.0410824,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/block/jobs": {
-   "last_success": 1795110063.8340962,
+   "last_success": 1795110667.0378566,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/brex/jobs": {
-   "last_success": 1795110063.7057772,
+   "last_success": 1795110666.9275417,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/carta/jobs": {
-   "last_success": 1795110065.0030606,
+   "last_success": 1795110668.3122807,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/chime/jobs": {
-   "last_success": 1795110063.7253785,
+   "last_success": 1795110666.9282823,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/cloudflare/jobs": {
-   "last_success": 1795110063.579765,
+   "last_success": 1795110666.7273922,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/cockroachlabs/jobs": {
-   "last_success": 1795110065.039794,
+   "last_success": 1795110668.3564403,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/coherehealth/jobs": {
-   "last_success": 1795110064.6716628,
+   "last_success": 1795110667.9397783,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/coinbase/jobs": {
-   "last_success": 1795110063.5688787,
+   "last_success": 1795110666.745248,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/coreweave/jobs": {
-   "last_success": 1795110064.5733585,
+   "last_success": 1795110667.786722,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/cresta/jobs": {
-   "last_success": 1795110064.5835967,
+   "last_success": 1795110667.8865695,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/databricks/jobs": {
-   "last_success": 1795110063.591892,
+   "last_success": 1795110666.8138971,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/datadog/jobs": {
-   "last_success": 1795110063.7515748,
+   "last_success": 1795110666.9165642,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/discord/jobs": {
-   "last_success": 1795110063.5026033,
+   "last_success": 1795110666.750313,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/doordashusa/jobs": {
-   "last_success": 1795110063.6683073,
+   "last_success": 1795110666.8387551,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/dropbox/jobs": {
-   "last_success": 1795110063.5975585,
+   "last_success": 1795110666.8434649,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/drweng/jobs": {
-   "last_success": 1795110063.9484134,
+   "last_success": 1795110667.1323144,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/duolingo/jobs": {
-   "last_success": 1795110063.5094306,
+   "last_success": 1795110666.7554386,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/elastic/jobs": {
-   "last_success": 1795110063.6508958,
+   "last_success": 1795110666.8664513,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/epicgames/jobs": {
-   "last_success": 1795110063.730065,
+   "last_success": 1795110666.9031756,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/faire/jobs": {
-   "last_success": 1795110063.7832522,
+   "last_success": 1795110667.0047524,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/figma/jobs": {
-   "last_success": 1795110063.5402145,
+   "last_success": 1795110666.7809713,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/figureai/jobs": {
-   "last_success": 1795110063.8605392,
+   "last_success": 1795110667.1078327,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/fiveringsllc/jobs": {
-   "last_success": 1795110063.9387004,
+   "last_success": 1795110667.141408,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/flexport/jobs": {
-   "last_success": 1795110063.7651508,
+   "last_success": 1795110666.9614093,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/flowtraders/jobs": {
-   "last_success": 1795110065.0930147,
+   "last_success": 1795110668.4002125,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/flyzipline/jobs": {
-   "last_success": 1795110065.1473517,
+   "last_success": 1795110668.414295,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/galileo/jobs": {
-   "last_success": 1795110064.7367084,
+   "last_success": 1795110667.972692,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/gemini/jobs": {
-   "last_success": 1795110065.031275,
+   "last_success": 1795110668.3398995,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/gitlab/jobs": {
-   "last_success": 1795110063.636407,
+   "last_success": 1795110666.894998,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/gleanwork/jobs": {
-   "last_success": 1795110063.8657725,
+   "last_success": 1795110667.0218828,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/grafanalabs/jobs": {
-   "last_success": 1795110065.0959687,
+   "last_success": 1795110668.3885658,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/gusto/jobs": {
-   "last_success": 1795110063.709514,
+   "last_success": 1795110666.9354978,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/helsing/jobs": {
-   "last_success": 1795110064.6414707,
+   "last_success": 1795110667.8921392,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/heygen/jobs": {
-   "last_success": 1795110064.733469,
+   "last_success": 1795110667.96986,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/imbue/jobs": {
-   "last_success": 1795110064.6488483,
+   "last_success": 1795110667.8954425,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/imc/jobs": {
-   "last_success": 1795110063.9182842,
+   "last_success": 1795110667.1219084,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/instacart/jobs": {
-   "last_success": 1795110063.5067239,
+   "last_success": 1795110666.7616143,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/janestreet/jobs": {
-   "last_success": 1795110064.75725,
+   "last_success": 1795110668.012651,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/jumptrading/jobs": {
-   "last_success": 1795110063.9235885,
+   "last_success": 1795110667.117531,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/kodiak/jobs": {
-   "last_success": 1795110064.7400317,
+   "last_success": 1795110667.9780364,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/labelbox/jobs": {
-   "last_success": 1795110064.6115444,
+   "last_success": 1795110667.8976383,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/lightningai/jobs": {
-   "last_success": 1795110064.6373384,
+   "last_success": 1795110667.889212,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/lyft/jobs": {
-   "last_success": 1795110063.5292952,
+   "last_success": 1795110666.7705784,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/mercury/jobs": {
-   "last_success": 1795110065.0060847,
+   "last_success": 1795110668.315609,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/mongodb/jobs": {
-   "last_success": 1795110063.6914315,
+   "last_success": 1795110666.879019,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/neuralink/jobs": {
-   "last_success": 1795110063.8888137,
+   "last_success": 1795110667.0902724,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/nuro/jobs": {
-   "last_success": 1795110063.8441534,
+   "last_success": 1795110667.0450728,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/okta/jobs": {
-   "last_success": 1795110063.6260235,
+   "last_success": 1795110666.888109,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/oldmissioncapital/jobs": {
@@ -560,159 +562,159 @@
    "ok": false
   },
   "https://boards-api.greenhouse.io/v1/boards/optiverus/jobs": {
-   "last_success": 1795110063.9382513,
+   "last_success": 1795110667.1512294,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/pdtpartners/jobs": {
-   "last_success": 1795110064.8447475,
+   "last_success": 1795110668.1026015,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/pinterest/jobs": {
-   "last_success": 1795110063.53514,
+   "last_success": 1795110666.7790585,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/point72/jobs": {
-   "last_success": 1795110063.9320397,
+   "last_success": 1795110667.1386156,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/purestorage/jobs": {
-   "last_success": 1795110064.2041717,
+   "last_success": 1795110666.922548,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/reddit/jobs": {
-   "last_success": 1795110063.5479562,
+   "last_success": 1795110666.801474,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/relativity/jobs": {
-   "last_success": 1795110063.9022582,
+   "last_success": 1795110667.0871053,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/ripple/jobs": {
-   "last_success": 1795110065.0554767,
+   "last_success": 1795110668.3446887,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/robinhood/jobs": {
-   "last_success": 1795110063.708707,
+   "last_success": 1795110666.9011772,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/roblox/jobs": {
-   "last_success": 1795110063.700042,
+   "last_success": 1795110666.9432633,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/sambanovasystems/jobs": {
-   "last_success": 1795110063.8206728,
+   "last_success": 1795110667.0131657,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/samsara/jobs": {
-   "last_success": 1795110063.778653,
+   "last_success": 1795110666.97739,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/scaleai/jobs": {
-   "last_success": 1795110063.4999785,
+   "last_success": 1795110666.7773445,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/schonfeld/jobs": {
-   "last_success": 1795110065.1591063,
+   "last_success": 1795110668.0679119,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/snorkelai/jobs": {
-   "last_success": 1795110064.634726,
+   "last_success": 1795110667.9146204,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/sofi/jobs": {
-   "last_success": 1795110065.014234,
+   "last_success": 1795110668.3287055,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/spacex/jobs": {
-   "last_success": 1795110063.9884574,
+   "last_success": 1795110688.1609833,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/squarepointcapital/jobs": {
-   "last_success": 1795110064.8297408,
+   "last_success": 1795110668.0855727,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/squarespace/jobs": {
-   "last_success": 1795110063.7712927,
+   "last_success": 1795110667.007132,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/stabilityai/jobs": {
-   "last_success": 1795110063.8237112,
+   "last_success": 1795110667.0099094,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/stripe/jobs": {
-   "last_success": 1795110063.6039994,
+   "last_success": 1795110671.7186759,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/tailscale/jobs": {
-   "last_success": 1795110065.177606,
+   "last_success": 1795110668.4015198,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/tenstorrent/jobs": {
-   "last_success": 1795110064.6602545,
+   "last_success": 1795110667.9179811,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/togetherai/jobs": {
-   "last_success": 1795110063.5137398,
+   "last_success": 1795110666.75656,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/towerresearchcapital/jobs": {
-   "last_success": 1795110064.0044649,
+   "last_success": 1795110667.1744266,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/twilio/jobs": {
-   "last_success": 1795110063.6207027,
+   "last_success": 1795110666.895731,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/vannevarlabs/jobs": {
-   "last_success": 1795110064.7371397,
+   "last_success": 1795110667.9675531,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/vercel/jobs": {
-   "last_success": 1795110063.7872798,
+   "last_success": 1795110666.9948695,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/verkada/jobs": {
-   "last_success": 1795110065.1256685,
+   "last_success": 1795110668.4075682,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/virtu/jobs": {
-   "last_success": 1795110064.0010383,
+   "last_success": 1795110667.1828017,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/waymo/jobs": {
-   "last_success": 1795110063.8556793,
+   "last_success": 1795110667.0575416,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/wehrtyou/jobs": {
-   "last_success": 1795110063.909019,
+   "last_success": 1795110667.1136465,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/wizinc/jobs": {
-   "last_success": 1795110065.0992072,
+   "last_success": 1795110668.7519014,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/worldquant/jobs": {
-   "last_success": 1795110064.8244834,
+   "last_success": 1795110668.0810955,
    "ok": true
   },
   "https://boards-api.greenhouse.io/v1/boards/xai/jobs": {
-   "last_success": 1795110063.8143516,
+   "last_success": 1795110667.0181246,
    "ok": true
   },
   "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json": {
-   "last_success": 1795110080.7052999,
+   "last_success": 1795110730.7764351,
    "ok": true
   },
   "https://raw.githubusercontent.com/jobright-ai/2026-Data-Analysis-Internship/master/README.md": {
-   "last_success": 1795110080.8455575,
+   "last_success": 1795110731.2421284,
    "ok": true
   },
   "https://raw.githubusercontent.com/jobright-ai/2026-Software-Engineer-Internship/master/README.md": {
-   "last_success": 1795110080.776707,
+   "last_success": 1795110731.1279688,
    "ok": true
   }
  },
  "stale_failed_sources": 3,
- "successful_sources": 172,
+ "successful_sources": 171,
  "sync_error": null
 }
