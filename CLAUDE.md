@@ -8,7 +8,7 @@ The `internship-pinger` Cloudflare Worker is now in this repository. It triggers
 
 ## Architecture facts
 
-- `watcher.py` fetches the configured Greenhouse, Lever, and Ashby boards and the enabled aggregate feeds.
+- `watcher.py` fetches the configured Greenhouse, Lever, Ashby, and Workday boards and the enabled aggregate feeds. Workday can instead consume a validated private laptop results file; see `sai_docs/09-workday-laptop.md`. Workday blocks and stale laptop data skip boards without source-down alerts. Direct Workday scans read two pages; the laptop defaults to five, supports per-board `max_pages`, and persists block cooldowns.
 - `job_feeds.py` defines the shared board endpoints and feed validation used by the watcher and verifier. `project_config.py` owns configuration validation, optional webhook imports, and shared defaults. `source_health.py` builds health reports without I/O; `watcher.py` persists them.
 - Wayve uses Ashby (`wayve`). Postman moved to Workday and is covered through the aggregate feeds, including an explicit SimplifyJobs company keyword; do not restore its dead Greenhouse entry or claim direct Workday coverage.
 - Filtering applies to all sources. Top-level `terms` is the season filter for every source; `simplify.terms` is only a backward-compatible fallback when top-level `terms` is absent. Unknown season terms are retained by default and can be controlled with `keep_unknown_terms`; profile terms can be configured independently.

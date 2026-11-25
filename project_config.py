@@ -46,6 +46,8 @@ def validate_config(cfg):
             for key in ("tenant", "site", "host"):
                 if not isinstance(company.get(key), str) or not re.fullmatch(r"[A-Za-z0-9_-]+", company[key]):
                     raise ValueError("Workday needs valid tenant, site, and host strings")
+            if "max_pages" in company and (type(company["max_pages"]) is not int or not 1 <= company["max_pages"] <= 10):
+                raise ValueError("Workday max_pages must be an integer from 1 to 10")
             if not re.fullmatch(r"wd[0-9]+", company["host"]):
                 raise ValueError("Workday host must look like wd5")
         elif not isinstance(company.get("board"), str) or not company["board"].strip():

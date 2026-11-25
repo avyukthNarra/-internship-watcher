@@ -18,3 +18,7 @@ delivery_state.json
 health.json
 message_map.json
 notion_state.json
+
+# Laptop scheduler runtime files
+laptop/.workday_backoff.json
+laptop/workday.log*
