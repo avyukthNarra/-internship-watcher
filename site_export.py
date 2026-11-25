@@ -5,14 +5,25 @@ import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from job_utils import canonical_url, clean_job, job_identity
+from job_utils import canonical_url, clean_job, job_identity, preference_matches
 from project_config import DEFAULT_SITE_EXPORT_DAYS
 
 MAX_SITE_EXPORT_JOBS = 5000
 EXPORT_FIELDS = frozenset({
     "id", "company", "title", "location", "url", "terms", "source",
-    "first_seen", "top",
+    "first_seen", "top", "roles",
 })
+# Public role labels, in display order. Each `alert_channels` entry whose name
+# is listed here contributes its label when the channel's role keywords or
+# SimplifyJobs categories match. Unlisted channel names add nothing, so a new
+# private channel name never reaches the public file.
+ROLE_LABELS = ("SWE", "Data", "ML/AI", "Research", "Embedded", "Hardware", "Quant")
+CHANNEL_ROLE_LABELS = {
+    "swe": "SWE", "data": "Data", "ml": "ML/AI", "research": "Research",
+    "embedded": "Embedded", "hardware": "Hardware", "hardware-by-title": "Hardware",
+    "quant": "Quant", "quant-by-title": "Quant",
+}
+_ROLE_MATCH_KEYS = ("roles", "exclude_roles", "categories")
 _SOURCES = frozenset({"greenhouse", "lever", "ashby", "workday", "simplify", "vanshb03", "jobright"})
 _PRIVATE_QUERY_KEYS = frozenset({
     "ref", "referrer", "referral", "source", "src", "token", "email", "e",
@@ -73,6 +84,25 @@ def _top_job(job, cfg):
         return True
     return any(str(keyword).lower() in company
                for keyword in cfg.get("simplify", {}).get("company_keywords", []))
+
+
+def _job_roles(job, cfg):
+    """Role labels from `alert_channels`, using the watcher's own whole-word
+    channel matching. Only role keywords, exclusions, and categories count:
+    a channel's term, company, or location limits describe who gets pinged,
+    not what kind of role a posting is."""
+    found = set()
+    channels = cfg.get("alert_channels", [])
+    for channel in channels if isinstance(channels, list) else ():
+        if not isinstance(channel, dict):
+            continue
+        label = CHANNEL_ROLE_LABELS.get(str(channel.get("name", "")).strip().lower())
+        if not label or label in found:
+            continue
+        criteria = {key: channel[key] for key in _ROLE_MATCH_KEYS if channel.get(key)}
+        if (criteria.get("roles") or criteria.get("categories")) and preference_matches(job, criteria):
+            found.add(label)
+    return [label for label in ROLE_LABELS if label in found]
 
 
 def _export_id(job, public_url):
@@ -138,6 +168,7 @@ def build_jobs_export(postings, previous_jobs=(), cfg=None, *, now=None, retenti
             "source": source,
             "first_seen": _iso_utc(seen),
             "top": _top_job(job, cfg),
+            "roles": _job_roles(job, cfg),
         }
         # Explicit reconstruction is the privacy boundary: no feed metadata,
         # delivery state, configuration, or prior unknown fields are copied.

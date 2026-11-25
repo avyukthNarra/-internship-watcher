@@ -1,392 +1,644 @@
 [
   {
-    "id": "4d7142176679ef424e3aa1a2eb8ed10d4633847dc5950d4788e933cc1ae9fede",
-    "company": "Fictional Company 01",
+    "id": "42c7d09192846a47b500dfdf776f2ef6359a00bc006b6cbac9d61800f0054367",
+    "company": "Aldermoor Labs",
     "title": "Software Engineer Intern",
-    "location": "Remote",
-    "url": "https://example.com/jobs/fictional-company-01",
+    "location": "San Francisco, CA",
+    "url": "https://example.com/jobs/aldermoor-labs-01",
     "terms": [
       "Summer 2027"
     ],
     "source": "greenhouse",
-    "first_seen": "2026-11-24T12:00:00Z",
-    "top": true
+    "first_seen": "2026-11-25T17:36:00Z",
+    "top": true,
+    "roles": [
+      "SWE"
+    ]
   },
   {
-    "id": "ac9f51f4af3f8bc1f65006ac125e68be899b744a683e24fff0ffb289c1c3d904",
-    "company": "Fictional Company 02",
-    "title": "Data Science Intern",
-    "location": "Austin, TX",
-    "url": "https://example.com/jobs/fictional-company-02",
+    "id": "b855bba0b6a28ccc565875995f4009f771f5cd6d01b6658e196c784a2ca2999e",
+    "company": "Brightloom",
+    "title": "Machine Learning Research Intern",
+    "location": "Remote in USA",
+    "url": "https://example.com/jobs/brightloom-02",
     "terms": [
-      "Fall 2026"
-    ],
-    "source": "lever",
-    "first_seen": "2026-11-24T11:00:00Z",
-    "top": false
-  },
-  {
-    "id": "682332b85d4262e05a44e4abf5ee3841ab03a595d94f55e8fc41c9fa88ec0d0e",
-    "company": "Fictional Company 03",
-    "title": "Robotics Research Intern",
-    "location": "Boston, MA",
-    "url": "https://example.com/jobs/fictional-company-03",
-    "terms": [
-      "Spring 2027"
+      "Summer 2027"
     ],
     "source": "ashby",
-    "first_seen": "2026-11-24T10:00:00Z",
-    "top": false
+    "first_seen": "2026-11-25T16:30:00Z",
+    "top": true,
+    "roles": [
+      "ML/AI",
+      "Research"
+    ]
   },
   {
-    "id": "9d55fec04027fbeeb21d8491392fe3f393dda510b42c5b0b827d05d9de25153f",
-    "company": "Fictional Company 04",
-    "title": "Hardware Engineering Intern",
-    "location": "Seattle, WA",
-    "url": "https://example.com/jobs/fictional-company-04",
+    "id": "1e7f9f2bddf4e67d148dc8fe27ec3a4aacdfb9db5dc04eb26e60ac1c5dc2d633",
+    "company": "Quartzline Trading",
+    "title": "Quantitative Trader Intern",
+    "location": "New York, NY",
+    "url": "https://example.com/jobs/quartzline-trading-03",
     "terms": [
       "Summer 2027"
     ],
     "source": "simplify",
+    "first_seen": "2026-11-25T15:48:00Z",
+    "top": true,
+    "roles": [
+      "Quant"
+    ]
+  },
+  {
+    "id": "ca8ee36509a929194adf87830546e221acfc60135a3ca0d8c2de44754d3500d3",
+    "company": "Cinderpath Robotics",
+    "title": "Embedded Software Intern",
+    "location": "Pittsburgh, PA",
+    "url": "https://example.com/jobs/cinderpath-robotics-04",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "lever",
+    "first_seen": "2026-11-25T15:00:00Z",
+    "top": false,
+    "roles": [
+      "Embedded"
+    ]
+  },
+  {
+    "id": "26865b66fa098cae46ce3a97f01bb05dd3641a43d7040f3338fd018fbd543774",
+    "company": "Dovetail Data",
+    "title": "Data Engineering Intern",
+    "location": "Austin, TX",
+    "url": "https://example.com/jobs/dovetail-data-05",
+    "terms": [
+      "Fall 2027",
+      "Summer 2027"
+    ],
+    "source": "jobright",
+    "first_seen": "2026-11-25T13:30:00Z",
+    "top": false,
+    "roles": [
+      "Data"
+    ]
+  },
+  {
+    "id": "9dbacca3c4cfb2f2c4f8f49c8dc8f1082305a81c46d3cd9bf50cbece7336f08a",
+    "company": "Fernwave Photonics",
+    "title": "Photonics Hardware Intern",
+    "location": "Boulder, CO",
+    "url": "https://example.com/jobs/fernwave-photonics-06",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "simplify",
+    "first_seen": "2026-11-25T13:00:00Z",
+    "top": false,
+    "roles": [
+      "Hardware"
+    ]
+  },
+  {
+    "id": "5753a281ce447d675c796aa50688bfd86cd013af2503d309b7e207015dd33feb",
+    "company": "Saltmarsh Software",
+    "title": "Full Stack Software Engineer Intern",
+    "location": "Remote",
+    "url": "https://example.com/jobs/saltmarsh-software-07",
+    "terms": [
+      "Spring 2027"
+    ],
+    "source": "vanshb03",
+    "first_seen": "2026-11-25T12:00:00Z",
+    "top": false,
+    "roles": [
+      "SWE"
+    ]
+  },
+  {
+    "id": "258be7562f3368d39e492fb70dd3f1beb94ca95613982c8ba2187bfbb032d596",
+    "company": "Kestrel Ridge Capital",
+    "title": "Quantitative Research Intern",
+    "location": "Chicago, IL",
+    "url": "https://example.com/jobs/kestrel-ridge-capital-08",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "greenhouse",
+    "first_seen": "2026-11-25T10:30:00Z",
+    "top": true,
+    "roles": [
+      "Research",
+      "Quant"
+    ]
+  },
+  {
+    "id": "686fd42e265f4b465e84e62888eb7605aa35178642707d34bd03a154bb3cf9ab",
+    "company": "Halcyon Grid",
+    "title": "Backend Engineer Intern (Distributed Systems)",
+    "location": "Seattle, WA; Remote in USA",
+    "url": "https://example.com/jobs/halcyon-grid-09",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "ashby",
+    "first_seen": "2026-11-25T09:00:00Z",
+    "top": true,
+    "roles": [
+      "SWE"
+    ]
+  },
+  {
+    "id": "e859b8ebcc86c0238fa8221f15fcab281e51104f04841bb422557eca7ae05b38",
+    "company": "Willowbyte",
+    "title": "Mobile Software Engineer Intern, iOS",
+    "location": "Los Angeles, CA",
+    "url": "https://example.com/jobs/willowbyte-10",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "lever",
+    "first_seen": "2026-11-25T07:00:00Z",
+    "top": false,
+    "roles": [
+      "SWE"
+    ]
+  },
+  {
+    "id": "d8ae9a9130abc29a200ca0b47092958c83f18e0df249a2baed0cf2a09bb6eb90",
+    "company": "Ironbark Semiconductors",
+    "title": "Digital Design Verification Intern",
+    "location": "Santa Clara, CA",
+    "url": "https://example.com/jobs/ironbark-semiconductors-11",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "workday",
+    "first_seen": "2026-11-25T05:00:00Z",
+    "top": true,
+    "roles": [
+      "Hardware"
+    ]
+  },
+  {
+    "id": "4abd2f57d799dbab1e84bf515584f56025b728f16e6b4dac032ea15e7e643dc7",
+    "company": "Yarrow Labs",
+    "title": "AI Infrastructure Intern",
+    "location": "San Francisco, CA",
+    "url": "https://example.com/jobs/yarrow-labs-12",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "ashby",
+    "first_seen": "2026-11-25T03:00:00Z",
+    "top": false,
+    "roles": [
+      "SWE",
+      "ML/AI"
+    ]
+  },
+  {
+    "id": "d0833fad84e5554c259a924295441aca86f22b02e8067e84dc3fe0e0afd5fb20",
+    "company": "Pebblestack",
+    "title": "Product Design Intern",
+    "location": "Brooklyn, NY",
+    "url": "https://example.com/jobs/pebblestack-13",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "jobright",
+    "first_seen": "2026-11-25T00:00:00Z",
+    "top": false,
+    "roles": []
+  },
+  {
+    "id": "27a7fd2166fe36f526d5c359804bbd16935a7a1020dc86872b1b47ec7d08b354",
+    "company": "Nimbus Orchard",
+    "title": "Platform Engineering Intern",
+    "location": "Remote in Canada",
+    "url": "https://example.com/jobs/nimbus-orchard-14",
+    "terms": [
+      "Winter 2027"
+    ],
+    "source": "vanshb03",
+    "first_seen": "2026-11-24T21:00:00Z",
+    "top": false,
+    "roles": [
+      "SWE"
+    ]
+  },
+  {
+    "id": "b66e734fb176da08d426b765793cc237ca13dec790b8c7ba04acb6e6a9b1c5f6",
+    "company": "Rivermark Health",
+    "title": "Data Analyst Intern",
+    "location": "Boston, MA",
+    "url": "https://example.com/jobs/rivermark-health-15",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "simplify",
+    "first_seen": "2026-11-24T19:00:00Z",
+    "top": false,
+    "roles": [
+      "Data"
+    ]
+  },
+  {
+    "id": "3afedc23dd15c566e9f4c9cf3cb00bbdc0dc096c36c50c5475c37187ab4ce8b9",
+    "company": "Emberline Systems",
+    "title": "Firmware Engineer Intern",
+    "location": "Detroit, MI",
+    "url": "https://example.com/jobs/emberline-systems-16",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "simplify",
+    "first_seen": "2026-11-24T16:00:00Z",
+    "top": false,
+    "roles": [
+      "Embedded"
+    ]
+  },
+  {
+    "id": "07b66736f147fb630494117a2066989096a4defefbbe7549b386e88a6cad265d",
+    "company": "Aldermoor Labs",
+    "title": "Security Software Engineer Intern",
+    "location": "New York, NY",
+    "url": "https://example.com/jobs/aldermoor-labs-17",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "greenhouse",
+    "first_seen": "2026-11-24T13:00:00Z",
+    "top": true,
+    "roles": [
+      "SWE"
+    ]
+  },
+  {
+    "id": "ed7e7ff5fbe37c9b275b37247695a5beb52e945cd05966788346f3ce37e22762",
+    "company": "Velvet Orbit",
+    "title": "Computer Vision Research Intern",
+    "location": "Remote",
+    "url": "https://example.com/jobs/velvet-orbit-18",
+    "terms": [
+      "Fall 2026",
+      "Spring 2027"
+    ],
+    "source": "ashby",
     "first_seen": "2026-11-24T09:00:00Z",
-    "top": true
+    "top": false,
+    "roles": [
+      "ML/AI",
+      "Research"
+    ]
   },
   {
-    "id": "f54bf51ca0ced94c51256e931e52e382b1ec28ba3caa3cc1f3af8cae99d7b7fd",
-    "company": "Fictional Company 05",
-    "title": "Product Design Intern",
-    "location": "Remote",
-    "url": "https://example.com/jobs/fictional-company-05",
-    "terms": [
-      "Fall 2026"
-    ],
-    "source": "vanshb03",
-    "first_seen": "2026-11-24T08:00:00Z",
-    "top": false
-  },
-  {
-    "id": "0924b208f31b57914af8965fa5c81d1f285698cd3edcc329f360665305c0d86d",
-    "company": "Fictional Company 06",
-    "title": "Software Engineer Intern",
-    "location": "Austin, TX",
-    "url": "https://example.com/jobs/fictional-company-06",
-    "terms": [
-      "Spring 2027"
-    ],
-    "source": "jobright",
-    "first_seen": "2026-11-24T07:00:00Z",
-    "top": false
-  },
-  {
-    "id": "62e1743d18400ca6222144a33f91cda50fb33c8b7d4eb30b9a968a162e286ff1",
-    "company": "Fictional Company 07",
-    "title": "Data Science Intern",
-    "location": "Boston, MA",
-    "url": "https://example.com/jobs/fictional-company-07",
+    "id": "ad9c9e3c2c65fcc3a0346bdda336d257e9ddeb3b800c2bd88a0f4d49ab840730",
+    "company": "Larchmont Devices",
+    "title": "Electrical Engineering Intern",
+    "location": "Raleigh, NC",
+    "url": "https://example.com/jobs/larchmont-devices-19",
     "terms": [
       "Summer 2027"
     ],
-    "source": "greenhouse",
-    "first_seen": "2026-11-24T06:00:00Z",
-    "top": true
-  },
-  {
-    "id": "773129b8e3ef473e7567686e1f090048ef181b33d9133b98f06d80131f7a9391",
-    "company": "Fictional Company 08",
-    "title": "Robotics Research Intern",
-    "location": "Seattle, WA",
-    "url": "https://example.com/jobs/fictional-company-08",
-    "terms": [
-      "Fall 2026"
-    ],
-    "source": "lever",
-    "first_seen": "2026-11-24T05:00:00Z",
-    "top": false
-  },
-  {
-    "id": "fa4a58461124492c16ed5f6587c9bade08229c90345b329d5d1fbcb1b190d415",
-    "company": "Fictional Company 09",
-    "title": "Hardware Engineering Intern",
-    "location": "Remote",
-    "url": "https://example.com/jobs/fictional-company-09",
-    "terms": [
-      "Spring 2027"
-    ],
-    "source": "ashby",
+    "source": "workday",
     "first_seen": "2026-11-24T04:00:00Z",
-    "top": false
+    "top": true,
+    "roles": [
+      "Hardware"
+    ]
   },
   {
-    "id": "d900985fb7451e1e1ccc69eb3326cfef824a60e0d7f7d7e99ef0f4dafe174ecf",
-    "company": "Fictional Company 10",
-    "title": "Product Design Intern",
-    "location": "Austin, TX",
-    "url": "https://example.com/jobs/fictional-company-10",
+    "id": "4bfce1f331a78945e3b83e264c69046121d1407f668b61359a74432b6cda3a23",
+    "company": "Oakfield Mobility",
+    "title": "Autonomy Software Intern",
+    "location": "Ann Arbor, MI",
+    "url": "https://example.com/jobs/oakfield-mobility-20",
     "terms": [
       "Summer 2027"
-    ],
-    "source": "simplify",
-    "first_seen": "2026-11-24T03:00:00Z",
-    "top": true
-  },
-  {
-    "id": "86b39a2af8e3f6cc13b8359a286f7236a6cde8a616ebb34ab0e7062eb2893d29",
-    "company": "Fictional Company 11",
-    "title": "Software Engineer Intern",
-    "location": "Boston, MA",
-    "url": "https://example.com/jobs/fictional-company-11",
-    "terms": [
-      "Fall 2026"
-    ],
-    "source": "vanshb03",
-    "first_seen": "2026-11-24T02:00:00Z",
-    "top": false
-  },
-  {
-    "id": "da84d9b2c85626ae19b2db21667d52004f3a832aad89fb356edb6f59755b80b9",
-    "company": "Fictional Company 12",
-    "title": "Data Science Intern",
-    "location": "Seattle, WA",
-    "url": "https://example.com/jobs/fictional-company-12",
-    "terms": [
-      "Spring 2027"
-    ],
-    "source": "jobright",
-    "first_seen": "2026-11-24T01:00:00Z",
-    "top": false
-  },
-  {
-    "id": "18cb844099b1f92d4fe78f3164828e42954faadd90915f28698e5c857b30d141",
-    "company": "Fictional Company 13",
-    "title": "Robotics Research Intern",
-    "location": "Remote",
-    "url": "https://example.com/jobs/fictional-company-13",
-    "terms": [
-      "Summer 2027"
-    ],
-    "source": "greenhouse",
-    "first_seen": "2026-11-24T00:00:00Z",
-    "top": true
-  },
-  {
-    "id": "9819591234d26f9ba2fa47816f0827091369eae36535ca6befea00ceea1f5b32",
-    "company": "Fictional Company 14",
-    "title": "Hardware Engineering Intern",
-    "location": "Austin, TX",
-    "url": "https://example.com/jobs/fictional-company-14",
-    "terms": [
-      "Fall 2026"
     ],
     "source": "lever",
-    "first_seen": "2026-11-23T23:00:00Z",
-    "top": false
-  },
-  {
-    "id": "549f4a1a443d74f900a524476a3cfa44b81528fabc7701965fdcd3adbc099379",
-    "company": "Fictional Company 15",
-    "title": "Product Design Intern",
-    "location": "Boston, MA",
-    "url": "https://example.com/jobs/fictional-company-15",
-    "terms": [
-      "Spring 2027"
-    ],
-    "source": "ashby",
     "first_seen": "2026-11-23T22:00:00Z",
-    "top": false
+    "top": false,
+    "roles": [
+      "SWE"
+    ]
   },
   {
-    "id": "a5ecb632659dee3b9de6aaee1bfca91bef377664acb26ba48ecd5fff568850db",
-    "company": "Fictional Company 16",
-    "title": "Software Engineer Intern",
-    "location": "Seattle, WA",
-    "url": "https://example.com/jobs/fictional-company-16",
+    "id": "08a24b264647101364bba5d3010493ed4bc985026d9da7432662713e69f73c2c",
+    "company": "Thistle & Finch",
+    "title": "Business Intelligence Intern",
+    "location": "Charlotte, NC",
+    "url": "https://example.com/jobs/thistle---finch-21",
     "terms": [
       "Summer 2027"
-    ],
-    "source": "simplify",
-    "first_seen": "2026-11-23T21:00:00Z",
-    "top": true
-  },
-  {
-    "id": "9a84530a9e7578b3a95548051fcadd227f1adf81377886c0db1fad0b5ade40b2",
-    "company": "Fictional Company 17",
-    "title": "Data Science Intern",
-    "location": "Remote",
-    "url": "https://example.com/jobs/fictional-company-17",
-    "terms": [
-      "Fall 2026"
-    ],
-    "source": "vanshb03",
-    "first_seen": "2026-11-23T20:00:00Z",
-    "top": false
-  },
-  {
-    "id": "f6684cb1e585db4271ef4d1e8738c1cb3c8a57276da990b9e91fa715a23cf89e",
-    "company": "Fictional Company 18",
-    "title": "Robotics Research Intern",
-    "location": "Austin, TX",
-    "url": "https://example.com/jobs/fictional-company-18",
-    "terms": [
-      "Spring 2027"
     ],
     "source": "jobright",
-    "first_seen": "2026-11-23T19:00:00Z",
-    "top": false
-  },
-  {
-    "id": "9850eb84b00a46442b08db13ceb9885e3c2c15cd66d96dffbdbc64a06e786286",
-    "company": "Fictional Company 19",
-    "title": "Hardware Engineering Intern",
-    "location": "Boston, MA",
-    "url": "https://example.com/jobs/fictional-company-19",
-    "terms": [
-      "Summer 2027"
-    ],
-    "source": "greenhouse",
-    "first_seen": "2026-11-23T18:00:00Z",
-    "top": true
-  },
-  {
-    "id": "2a69eed366090e345becc9da10a612327b0571dd64e0b18799cf8915904f5ffd",
-    "company": "Fictional Company 20",
-    "title": "Product Design Intern",
-    "location": "Seattle, WA",
-    "url": "https://example.com/jobs/fictional-company-20",
-    "terms": [
-      "Fall 2026"
-    ],
-    "source": "lever",
-    "first_seen": "2026-11-23T17:00:00Z",
-    "top": false
-  },
-  {
-    "id": "b476ec4daf27c210524a58d05c6620e03fa80e673945431ffc35e0094a928794",
-    "company": "Fictional Company 21",
-    "title": "Software Engineer Intern",
-    "location": "Remote",
-    "url": "https://example.com/jobs/fictional-company-21",
-    "terms": [
-      "Spring 2027"
-    ],
-    "source": "ashby",
     "first_seen": "2026-11-23T16:00:00Z",
-    "top": false
+    "top": false,
+    "roles": [
+      "Data"
+    ]
   },
   {
-    "id": "d0d09160816e2e65f442227a7d2cd0e8e91eb50b34c2868625bfef53c0cf07c6",
-    "company": "Fictional Company 22",
-    "title": "Data Science Intern",
-    "location": "Austin, TX",
-    "url": "https://example.com/jobs/fictional-company-22",
+    "id": "1dcc7fd0f056f2334e76e1e01b291af6a0e448bb3a71c041a47eb15b7e62e674",
+    "company": "Moonquarry",
+    "title": "Frontend Engineer Intern",
+    "location": "Remote",
+    "url": "https://example.com/jobs/moonquarry-22",
+    "terms": [
+      "Spring 2027"
+    ],
+    "source": "vanshb03",
+    "first_seen": "2026-11-23T10:00:00Z",
+    "top": false,
+    "roles": [
+      "SWE"
+    ]
+  },
+  {
+    "id": "c5693e3a7849363ac9a8dcde1eebd6e2138d4985159b20f67e088b649c470def",
+    "company": "Glasswing Markets",
+    "title": "Summer Analyst, Trading",
+    "location": "London, UK",
+    "url": "https://example.com/jobs/glasswing-markets-23",
     "terms": [
       "Summer 2027"
     ],
     "source": "simplify",
-    "first_seen": "2026-11-23T15:00:00Z",
-    "top": true
+    "first_seen": "2026-11-23T04:00:00Z",
+    "top": false,
+    "roles": [
+      "Data",
+      "Quant"
+    ]
   },
   {
-    "id": "1a1e886d14961c6495cbdf55901d674e672f7edb9a9f546cb8f7de055e883fd4",
-    "company": "Fictional Company 23",
-    "title": "Robotics Research Intern",
-    "location": "Boston, MA",
-    "url": "https://example.com/jobs/fictional-company-23",
+    "id": "c8769fa8341c2885dbeb745c930ceefed5bd04db1dffc8ed22df529cfad457a2",
+    "company": "Zephyr Lattice",
+    "title": "Research Scientist Intern, Large Language Models",
+    "location": "Remote in USA",
+    "url": "https://example.com/jobs/zephyr-lattice-24",
     "terms": [
-      "Fall 2026"
+      "Summer 2027"
     ],
-    "source": "vanshb03",
-    "first_seen": "2026-11-23T14:00:00Z",
-    "top": false
+    "source": "ashby",
+    "first_seen": "2026-11-22T20:00:00Z",
+    "top": true,
+    "roles": [
+      "Research"
+    ]
   },
   {
-    "id": "8490a97d3fcc0f4c9fac47c884667d200286de5a3e7e9d8dbc3b83e44f14d0b2",
-    "company": "Fictional Company 24",
-    "title": "Hardware Engineering Intern",
-    "location": "Seattle, WA",
-    "url": "https://example.com/jobs/fictional-company-24",
-    "terms": [
-      "Spring 2027"
-    ],
-    "source": "jobright",
-    "first_seen": "2026-11-23T13:00:00Z",
-    "top": false
-  },
-  {
-    "id": "bf0806d1ac56433f3b45b1306326661482c8b59461a4231590b15dcfcf6f5d3d",
-    "company": "Fictional Company 25",
-    "title": "Product Design Intern",
-    "location": "Remote",
-    "url": "https://example.com/jobs/fictional-company-25",
+    "id": "d97d44eed3508321ca7f2e0ddb4f7c8a41c96547fca80088fcb665d2026065a4",
+    "company": "Umberfield",
+    "title": "DevOps Engineer Intern",
+    "location": "Denver, CO",
+    "url": "https://example.com/jobs/umberfield-25",
     "terms": [
       "Summer 2027"
     ],
     "source": "greenhouse",
-    "first_seen": "2026-11-23T12:00:00Z",
-    "top": true
+    "first_seen": "2026-11-22T10:00:00Z",
+    "top": false,
+    "roles": [
+      "SWE"
+    ]
   },
   {
-    "id": "b8ba809ec54dc5b2c8f89359dc114c20d86951b8b729fb135bfae06fa9fb341b",
-    "company": "Fictional Company 26",
-    "title": "Software Engineer Intern",
-    "location": "Austin, TX",
-    "url": "https://example.com/jobs/fictional-company-26",
+    "id": "9314db57f7710660d5abf6711681e85f55c1f2e332d2ff950a9868b1b95e132e",
+    "company": "Cinderpath Robotics",
+    "title": "Robotics Perception Intern",
+    "location": "Pittsburgh, PA",
+    "url": "https://example.com/jobs/cinderpath-robotics-26",
     "terms": [
-      "Fall 2026"
+      "Summer 2027"
     ],
     "source": "lever",
-    "first_seen": "2026-11-23T11:00:00Z",
-    "top": false
+    "first_seen": "2026-11-21T22:00:00Z",
+    "top": false,
+    "roles": []
   },
   {
-    "id": "141438094bc389ea858ca2904929da679e92cef96fb8f04ed0d018a18430e3e5",
-    "company": "Fictional Company 27",
-    "title": "Data Science Intern",
-    "location": "Boston, MA",
-    "url": "https://example.com/jobs/fictional-company-27",
+    "id": "7280c28bdcc335a3d71a37055d55b550b453137682948013395b6045c9d3e390",
+    "company": "Dovetail Data",
+    "title": "Analytics Engineering Intern",
+    "location": "Remote",
+    "url": "https://example.com/jobs/dovetail-data-27",
     "terms": [
-      "Spring 2027"
+      "Fall 2027"
+    ],
+    "source": "jobright",
+    "first_seen": "2026-11-21T10:00:00Z",
+    "top": false,
+    "roles": [
+      "Data"
+    ]
+  },
+  {
+    "id": "847c79405338423ac5f2b39b7653bfabf0618a12d6aad695e466d6bd1073bf6c",
+    "company": "Brightloom",
+    "title": "Deep Learning Compiler Intern",
+    "location": "Mountain View, CA",
+    "url": "https://example.com/jobs/brightloom-28",
+    "terms": [
+      "Summer 2027"
     ],
     "source": "ashby",
-    "first_seen": "2026-11-23T10:00:00Z",
-    "top": false
+    "first_seen": "2026-11-20T20:00:00Z",
+    "top": true,
+    "roles": [
+      "ML/AI"
+    ]
   },
   {
-    "id": "fd03b1e046ec41228928c1e37ed66deedecad06784603c62683d70da24a07542",
-    "company": "Fictional Company 28",
-    "title": "Robotics Research Intern",
-    "location": "Seattle, WA",
-    "url": "https://example.com/jobs/fictional-company-28",
+    "id": "698cb159a7f862cc7efb5e54eb48d65c6dac76c93a6d227e1b1cae9e2db32654",
+    "company": "Pinecrest Silicon",
+    "title": "ASIC Design Intern",
+    "location": "Austin, TX",
+    "url": "https://example.com/jobs/pinecrest-silicon-29",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "workday",
+    "first_seen": "2026-11-20T08:00:00Z",
+    "top": true,
+    "roles": [
+      "Embedded"
+    ]
+  },
+  {
+    "id": "ac5828ad57ab4330f1ac67acdd0b79c0ba03a98cfd383ece9fb23208ac465b5a",
+    "company": "Fernwave Photonics",
+    "title": "Thermal Test Engineer Intern",
+    "location": "Boulder, CO",
+    "url": "https://example.com/jobs/fernwave-photonics-30",
     "terms": [
       "Summer 2027"
     ],
     "source": "simplify",
-    "first_seen": "2026-11-23T09:00:00Z",
-    "top": true
+    "first_seen": "2026-11-19T12:00:00Z",
+    "top": false,
+    "roles": [
+      "Hardware"
+    ]
   },
   {
-    "id": "e8b0c707aa86423ade5541fc2c68974f76a4732ad07df2886d6987406c6cf907",
-    "company": "Fictional Company 29",
-    "title": "Hardware Engineering Intern",
+    "id": "f1af6ec08eb5eca72a00f154f0e31e634195d4893713a521b23c1ed9a12d4632",
+    "company": "Saltmarsh Software",
+    "title": "Software Engineering Intern, Developer Tools and Internal Platforms Group",
     "location": "Remote",
-    "url": "https://example.com/jobs/fictional-company-29",
+    "url": "https://example.com/jobs/saltmarsh-software-31",
     "terms": [
-      "Fall 2026"
+      "Summer 2027"
     ],
     "source": "vanshb03",
-    "first_seen": "2026-11-23T08:00:00Z",
-    "top": false
+    "first_seen": "2026-11-18T16:00:00Z",
+    "top": false,
+    "roles": [
+      "SWE"
+    ]
   },
   {
-    "id": "cf46725e52cf8cf31e22d3eb21fd990831d10a46fa00c1388f413fe0564be0e5",
-    "company": "Fictional Company 30",
-    "title": "Product Design Intern",
-    "location": "Austin, TX",
-    "url": "https://example.com/jobs/fictional-company-30",
+    "id": "ecb5d0df930d0bfc055b4c0ecc8a6b36dde5ae7af2d228c98df40315d93a72ab",
+    "company": "Quillstone Capital",
+    "title": "Software Engineer Intern - Trading Systems",
+    "location": "New York, NY",
+    "url": "https://example.com/jobs/quillstone-capital-32",
     "terms": [
-      "Spring 2027"
+      "Summer 2027"
+    ],
+    "source": "greenhouse",
+    "first_seen": "2026-11-17T10:00:00Z",
+    "top": true,
+    "roles": [
+      "SWE",
+      "Quant"
+    ]
+  },
+  {
+    "id": "bde515980676bcad177c3faf10179d481653e99619c54672c41d5ea7ad3085e3",
+    "company": "Harrowgate Bio",
+    "title": "Computational Biology Research Intern",
+    "location": "Cambridge, MA",
+    "url": "https://example.com/jobs/harrowgate-bio-33",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "lever",
+    "first_seen": "2026-11-15T18:00:00Z",
+    "top": false,
+    "roles": [
+      "Research"
+    ]
+  },
+  {
+    "id": "61f4355e83576aa9c1f7f610f8b11a3944a6c830984f8b6d44daeb178761a88b",
+    "company": "Tidewater Analytics",
+    "title": "Data Science Intern",
+    "location": "Miami, FL",
+    "url": "https://example.com/jobs/tidewater-analytics-34",
+    "terms": [
+      "Summer 2027"
     ],
     "source": "jobright",
-    "first_seen": "2026-11-23T07:00:00Z",
-    "top": false
+    "first_seen": "2026-11-13T06:00:00Z",
+    "top": false,
+    "roles": [
+      "Data"
+    ]
+  },
+  {
+    "id": "ebc9fccd3be1d7d5cfeead8b32ece7eeeb42bdf2cfb6ab864bdb6a09af73aeb4",
+    "company": "Corvid Aerospace",
+    "title": "Avionics Hardware Intern",
+    "location": "Huntsville, AL",
+    "url": "https://example.com/jobs/corvid-aerospace-35",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "simplify",
+    "first_seen": "2026-11-10T18:00:00Z",
+    "top": false,
+    "roles": [
+      "Hardware"
+    ]
+  },
+  {
+    "id": "206a24d39120df45ac2c854c4514f4d98d96c03b30b78e4f94d07ce261521792",
+    "company": "Marigold Robotics",
+    "title": "Embedded Linux Kernel Intern",
+    "location": "San Jose, CA",
+    "url": "https://example.com/jobs/marigold-robotics-36",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "ashby",
+    "first_seen": "2026-11-07T20:00:00Z",
+    "top": false,
+    "roles": [
+      "Embedded"
+    ]
+  },
+  {
+    "id": "4bf0a9a20df7f5afbd3929190d44cdf29c0acf2c687278b2b021161179b39fc1",
+    "company": "Lumen Fieldworks",
+    "title": "Operations Intern",
+    "location": "Columbus, OH",
+    "url": "",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "jobright",
+    "first_seen": "2026-11-04T22:00:00Z",
+    "top": false,
+    "roles": []
+  },
+  {
+    "id": "f3caf15d2abc6a50dfa39648bfef60cc1dafb4a95e93668287429dedfdf4752e",
+    "company": "Aldermoor Labs",
+    "title": "Machine Learning Engineer Intern",
+    "location": "San Francisco, CA",
+    "url": "https://example.com/jobs/aldermoor-labs-38",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "greenhouse",
+    "first_seen": "2026-10-30T22:00:00Z",
+    "top": true,
+    "roles": [
+      "ML/AI"
+    ]
+  },
+  {
+    "id": "166fe459e94ee9fe4658c8836a894f0eab16fdd72977b115d31b27473376859a",
+    "company": "Gossamer Games",
+    "title": "Gameplay Software Engineer Intern",
+    "location": "Montreal, QC, Canada",
+    "url": "https://example.com/jobs/gossamer-games-39",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "lever",
+    "first_seen": "2026-10-25T02:00:00Z",
+    "top": false,
+    "roles": [
+      "SWE"
+    ]
+  },
+  {
+    "id": "ce8df0e1c7d784b6688ffbdc7b1ef0f94ec335edc993a2bb7fcffa363d4de524",
+    "company": "Wrenfield Energy",
+    "title": "Power Electronics Intern",
+    "location": "Location not specified",
+    "url": "https://example.com/jobs/wrenfield-energy-40",
+    "terms": [
+      "Summer 2027"
+    ],
+    "source": "workday",
+    "first_seen": "2026-10-19T06:00:00Z",
+    "top": false,
+    "roles": [
+      "Hardware"
+    ]
   }
 ]

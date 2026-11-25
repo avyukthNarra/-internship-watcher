@@ -12,6 +12,9 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 - Added an optional Windows laptop fetcher and private-repository handoff for Workday, with validation, freshness checks, and setup documentation.
 - Added 94 verified direct company boards (79 Greenhouse/Lever/Ashby, 15 Workday) and 20 TOP-routing company keywords from the 120-day internship coverage review; Workday coverage now uses the 20-board cap.
 - Company entries accept `"top": false`: the board is read directly but posts to the main channel and keeps only titles matching an alert-channel role. Most newly added boards use it.
+- Redesigned the `web/` internship browser as a dense, scannable job board: sticky search bar (`/` to focus), role filter chips with live counts, term, location, Remote, New (24h), and Top companies filters, company drill-down, shareable URL query state, monogram avatars, NEW/TOP badges, relative first-seen times, incremental "show more" rendering for 3,000+ rows, loading, empty, and error states, light and dark themes, and a layout that works at 360px. Still plain HTML/CSS/JS with no build step.
+- `jobs.json` entries gain a `roles` array (`SWE`, `Data`, `ML/AI`, `Research`, `Embedded`, `Hardware`, `Quant`) derived from `alert_channels` with the watcher's channel matching. The page infers roles from titles when the field is missing.
+- Deploy-ready static host config for the site: `web/_headers` (Netlify) and `web/vercel.json` (Vercel) send the same CSP with `frame-ancestors 'none'`, `nosniff`, referrer policy, and short `jobs.json` caching. Nothing is deployed; `web/README.md` covers both hosts and how to point `DATA_URL` at a published `jobs.json`.
 
 - Added a paginated Workday source and verifier support; configured the verified NVIDIA, Salesforce, Adobe, Blue Origin, and Boston Dynamics boards.
 

@@ -19,6 +19,22 @@ these fields:
 | `source` | string | Source name: `greenhouse`, `lever`, `ashby`, `simplify`, `vanshb03`, `jobright`, or `unknown`. |
 | `first_seen` | string | First observation in UTC ISO 8601 format, such as `2026-11-24T12:00:00Z`. |
 | `top` | boolean | The watcher's existing top-company or top-source classification. |
+| `roles` | array of strings | Role labels, in this order when present: `SWE`, `Data`, `ML/AI`, `Research`, `Embedded`, `Hardware`, `Quant`. Empty when none match. |
+
+`roles` comes from `config.json` `alert_channels`, using the same whole-word
+`preference_matches` rule that routes Discord channel alerts. Only a channel's
+`roles`, `exclude_roles`, and `categories` count; its term, company, location,
+and webhook settings are ignored and never exported. Channel names map to
+labels as follows: `swe` → `SWE`, `data` → `Data`, `ml` → `ML/AI`, `research`
+→ `Research`, `embedded` → `Embedded`, `hardware` and `hardware-by-title` →
+`Hardware`, `quant` and `quant-by-title` → `Quant`. Channels with other names
+add no label, so a new channel stays private until it is added to
+`CHANNEL_ROLE_LABELS` in `site_export.py`. A posting can have several labels
+(for example `ML/AI` and `Research`). With no `alert_channels`, every list is
+empty.
+
+Consumers should tolerate a missing `roles` key (exports written before the
+field existed). The `web/` page then infers roles from the title.
 
 The export contains only postings present in the current scan. Previously
 exported entries are used only to preserve `first_seen`, so a posting that

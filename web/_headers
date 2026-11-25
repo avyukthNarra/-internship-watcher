@@ -1,0 +1,15 @@
+# Netlify response headers (publish directory: web/). Keep in sync with
+# vercel.json; web/app.test.js checks that both files match.
+/*
+  Content-Security-Policy: default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/jobs.json
+  Cache-Control: public, max-age=60, stale-while-revalidate=300
+
+/sample-jobs.json
+  Cache-Control: public, max-age=60, stale-while-revalidate=300

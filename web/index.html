@@ -3,68 +3,140 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
-  <title>Internships</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Search and filter current software, data, ML, hardware, and quant internships.">
+  <title>Internship Board</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <a class="skip" href="#results">Skip to results</a>
-  <main class="wrap">
-    <header class="mast">
-      <h1>Internships</h1>
-      <p class="lede">Browse current openings. This copy uses fictional sample listings until a live jobs file is published.</p>
-    </header>
 
-    <form id="filters" class="filters">
-      <label class="field span-2" for="search">
-        Search
-        <input id="search" name="query" type="search" autocomplete="off" spellcheck="false">
-      </label>
+  <header class="topbar" id="topbar">
+    <div class="bar">
+      <a class="brand" href="./" aria-label="Internship Board, reset filters">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor"/>
+          <path class="brand-lines" d="M8 9.5h8M8 13h8M8 16.5h5" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <span class="brand-name">Internships</span>
+      </a>
 
-      <label class="field" for="company">
-        Company
-        <select id="company" name="company">
-          <option value="">All companies</option>
-        </select>
-      </label>
+      <form class="search" id="search-form" role="search">
+        <svg class="search-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+          <path d="m13 13 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        <label class="visually-hidden" for="search">Search company, title, or location</label>
+        <input id="search" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Search company, title, location" aria-keyshortcuts="/">
+        <kbd class="kbd" aria-hidden="true">/</kbd>
+      </form>
 
-      <label class="field" for="term">
-        Term
-        <select id="term" name="term">
-          <option value="">All terms</option>
-        </select>
-      </label>
+      <button type="button" class="filters-toggle" id="filters-toggle"
+              aria-expanded="false" aria-controls="filter-panel">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M3 5h14M6 10h8M8.5 15h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        <span>Filters</span>
+        <span class="toggle-count" id="filters-count" hidden></span>
+      </button>
+    </div>
 
-      <label class="field span-2" for="location">
-        Location
-        <input id="location" name="location" type="text" autocomplete="off">
-      </label>
+    <div class="filter-panel" id="filter-panel">
+      <div class="chips" role="group" aria-label="Role">
+        <button type="button" class="chip" data-role="SWE" aria-pressed="false">SWE <span class="chip-count"></span></button>
+        <button type="button" class="chip" data-role="Data" aria-pressed="false">Data <span class="chip-count"></span></button>
+        <button type="button" class="chip" data-role="ML/AI" aria-pressed="false">ML/AI <span class="chip-count"></span></button>
+        <button type="button" class="chip" data-role="Research" aria-pressed="false">Research <span class="chip-count"></span></button>
+        <button type="button" class="chip" data-role="Embedded" aria-pressed="false">Embedded <span class="chip-count"></span></button>
+        <button type="button" class="chip" data-role="Hardware" aria-pressed="false">Hardware <span class="chip-count"></span></button>
+        <button type="button" class="chip" data-role="Quant" aria-pressed="false">Quant <span class="chip-count"></span></button>
+      </div>
 
-      <label class="check" for="new-only">
-        <input id="new-only" name="newOnly" type="checkbox">
-        New in last 24h
-      </label>
+      <div class="controls">
+        <label class="select">
+          <span class="visually-hidden">Term</span>
+          <select id="term">
+            <option value="">All terms</option>
+          </select>
+        </label>
 
-      <label class="check" for="top-only">
-        <input id="top-only" name="topOnly" type="checkbox">
-        Top only
-      </label>
+        <label class="text-control">
+          <span class="visually-hidden">Location contains</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M10 17.5s5.5-5.2 5.5-9.3a5.5 5.5 0 0 0-11 0c0 4.1 5.5 9.3 5.5 9.3Z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <circle cx="10" cy="8.2" r="2" fill="currentColor"/>
+          </svg>
+          <input id="location" type="text" autocomplete="off" spellcheck="false" placeholder="Location">
+        </label>
 
-      <label class="field" for="sort">
-        Sort
-        <select id="sort" name="sort">
-          <option value="newest" selected>Newest first</option>
-          <option value="oldest">Oldest first</option>
-        </select>
-      </label>
-    </form>
+        <button type="button" class="toggle" id="remote-only" aria-pressed="false">Remote</button>
+        <button type="button" class="toggle" id="new-only" aria-pressed="false">
+          <span class="dot dot-new" aria-hidden="true"></span>New (24h)
+        </button>
+        <button type="button" class="toggle" id="top-only" aria-pressed="false">
+          <svg class="star" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="m10 2.5 2.3 4.7 5.2.8-3.8 3.6.9 5.1L10 14.3l-4.6 2.4.9-5.1L2.5 8l5.2-.8L10 2.5Z" fill="currentColor"/>
+          </svg>Top companies
+        </button>
 
-    <p id="status" class="status" role="status" aria-live="polite">Loading internships…</p>
-    <p id="retry-row" hidden>
-      <button type="button" id="retry">Try again</button>
-    </p>
-    <ul id="results" class="jobs"></ul>
+        <label class="select select-sort">
+          <span class="visually-hidden">Sort</span>
+          <select id="sort">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="meta-row">
+      <p class="count" id="status" role="status" aria-live="polite">Loading internships…</p>
+      <div class="active" id="active-filters"></div>
+      <button type="button" class="link-button" id="clear" hidden>Clear filters</button>
+    </div>
+  </header>
+
+  <main class="wrap" id="main">
+    <h1 class="visually-hidden">Internship Board</h1>
+    <ol class="jobs" id="results" aria-label="Internships" tabindex="-1"></ol>
+
+    <ol class="jobs skeleton" id="skeleton" aria-hidden="true"></ol>
+
+    <section class="state" id="empty" hidden>
+      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle cx="21" cy="21" r="12" fill="none" stroke="currentColor" stroke-width="2.5"/>
+        <path d="m30 30 9 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      <h2 id="empty-title">No internships match</h2>
+      <p id="empty-body">Try removing a filter or searching for something broader.</p>
+      <button type="button" class="button" id="empty-clear">Clear all filters</button>
+    </section>
+
+    <section class="state" id="error" hidden>
+      <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="2.5"/>
+        <path d="M24 15v11M24 32.5v.5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <h2>Couldn’t load internships</h2>
+      <p>The listings file didn’t respond. Check your connection and try again.</p>
+      <button type="button" class="button" id="retry">Try again</button>
+    </section>
+
+    <div class="more" id="more-row" hidden>
+      <button type="button" class="button button-quiet" id="more">Show more</button>
+      <p class="more-note" id="more-note"></p>
+    </div>
+
+    <footer class="foot">
+      <p>Listings are collected automatically from public job boards and aggregate feeds. Always confirm details on the employer’s page.</p>
+      <p>Press <kbd class="kbd">/</kbd> to search.</p>
+    </footer>
   </main>
+
   <script src="jobs.js"></script>
   <script src="app.js"></script>
 </body>
