@@ -1,190 +1,271 @@
-# Plan: move the watcher's state into a database
+# Plan: Supabase database, user accounts and website
 
-Status: **plan only, nothing built yet.** Written 2026-11-25 on branch `avy-dev`.
+Status: **plan, not built.** Updated 2026-11-25 on branch `avy-dev`.
 
-## Why
+## Goal
 
-The watcher runs every 10 minutes from GitHub Actions. Each run does three things:
+Turn the watcher from a Discord bot with JSON files into a pipeline plus a website:
 
-1. checks out the private repo `avyukthNarra/internship-watcher-state`;
-2. loads five JSON files from it;
-3. commits the files back, together with a full `snapshot/` copy.
+- **The pipeline** (GitHub Actions, every 10 minutes) scrapes boards, as it does today, and writes jobs into Supabase.
+- **Users sign in** on the website and get:
+  - a job feed;
+  - their own tracker: which jobs they saved or applied to, and **when they applied**;
+  - their own **top-company list**, which defaults to the list in this repo;
+  - alert preferences, by Discord DM or email.
+- The **Discord bot keeps working**. Its 📌 pins and applied-channel links write into the same per-user tracker.
 
-| File | Size | What it holds |
-|---|---|---|
-| `delivery_state.json` | 2.5 MB | the delivery ledger (see below) |
-| `seen.json` | 1.0 MB | sorted list of every job ID ever seen |
-| `message_map.json` | 121 KB | `{discord_message_id: {cid, ts, job}}`, pruned to 3 days |
-| `health.json` | 27 KB | per-source health, rebuilt every run |
-| `notion_state.json` | 10 KB | Notion database and page IDs per Discord user, retry queues, cursors |
+## Accounts: what to use for login
 
-The ledger (`delivery_state.json`) holds:
-- `known_ids`, a copy of seen;
-- `seeded_sources`;
-- `identities`;
-- `fingerprints`, which expire after `dedup_days`;
-- `pending`, `{job_id: {job, destinations[], tries, attempts, error}}`;
-- `dead`.
+**Recommendation: Supabase Auth with "Sign in with Discord" as the main button and "Sign in with Google" as the second one.** No passwords.
 
-### Problems with this
+- **Discord login gives us the user's Discord ID.** That's what DMs, 📌 pin tracking and the applied channel all key on. Today `config.json` `profiles` and `notion_state.json` `users` are already keyed by Discord user ID.
+- **Google login** covers people who don't use Discord. They get email alerts and can link Discord later.
+- **Supabase identity linking** joins both logins into one account, so the same email or a manual "Connect Discord" button doesn't create duplicates.
+- **Built into Supabase:** auth is part of the database, so row-level security can say "a user can only see their own rows" with `auth.uid()`, with no separate auth service to keep in sync. The free plan includes 50k monthly active users.
 
-- **Churn.** The private repo got 105 commits on its first day. At that rate it gets about 50k commits a year, each rewriting roughly 7 MB of JSON.
-- **Push races.** Persisting means `pull --rebase` and push, with 3 retries. A real conflict fails the run.
-- **Unbounded growth.** These are never pruned:
-  - `seen.json`
-  - `known_ids`, `identities` and `dead` in the ledger
-  - Notion `users.jobs`
-- **`jobs.json` is never kept.** It is gitignored and not persisted, so `first_seen` resets every run, and the website still reads `web/sample-jobs.json`.
-- **The website needs a backend.** `sai_docs/04-todo.md` plans Discord login and per-user saved/applied jobs, and a static Vercel or Netlify site can't store that.
+Is Google auth alone a good idea? It's fine for logging in, but it doesn't tell us who someone is on Discord. Discord-first fits this product better.
 
-## How state is accessed today (what we'd change)
+| Alternative | Verdict |
+|---|---|
+| Clerk | Polished prebuilt UI, but a second vendor, and RLS needs extra JWT wiring |
+| Auth.js (NextAuth) | Free and flexible, but we run sessions ourselves and wire RLS by hand |
+| Firebase Auth | Good, but it's a different ecosystem from our Postgres |
+| Email and password | More support burden (resets, leaks) and no benefit here |
+| Magic link email | Fine as an optional third option later |
 
-There is no storage layer. Everything goes through two helpers in `job_utils.py`:
-- `load_json(path, default)` returns `default` if the file is missing and raises on corrupt JSON;
-- `save_json(path, data)` does an atomic temp-file write and rename.
+## Architecture
 
-Call sites on `main`:
-- **save:** `watcher.py:635, 746, 797, 800, 803, 828`, `notion_sync.py:517`
-- **load:** `watcher.py:767, 769, 770, 801`, `notion_sync.py:511, 686`
-- **Not state:** `config.json`, `legacy_board_sources.json`, and `jobs.json` also go through these helpers, but they aren't state files.
+```
+GitHub Actions watcher (Python, every 10 min)
+   ├─ upserts jobs ─────────────────────┐
+   ├─ reads users' prefs + top lists    │
+   ├─ sends channel posts / DMs / email ▼
+   │                               Supabase (Postgres + Auth + REST)
+   │                                    ▲            ▲
+Discord bot (📌 pins, #applied)  ───────┘            │
+                                                     │
+Website: Next.js on Vercel  ──── supabase-js ────────┘
+   (jobs feed, login, my tracker, settings)
+```
 
-`watcher.main` calls `checkpoint()` after every delivery attempt, which re-saves the ledger. `notion_sync._save` runs many times per run.
+- **The pipeline** connects with a server-only key (the database URL or service role), stored in the GitHub `production` environment. That key bypasses row-level security.
+- **The website** uses the public anon key plus the signed-in user's session. Row-level security decides what each user can read or write.
+- **Hosting: Vercel**, the natural home for Next.js. This settles the open question from Sai's step 5.
 
-Tests point the path constants at temp directories:
-- `test_watcher.py:149` patches `ROOT`, `SEEN_PATH` and `MSG_MAP_PATH`;
-- `test_notion_sync.py:20` patches `STATE_PATH`;
-- `test_pipeline.py:14` patches `ROOT`.
+## Schema
 
-## Chosen approach: Supabase Postgres, quick cutover
+All of this lives in `supabase/migrations/*.sql`, managed with the Supabase CLI.
 
-Keep the bot logic unchanged and swap only where the five files live.
+### Jobs (written by the pipeline, readable by everyone)
 
-### Why Supabase
-- **Free tier:** 500 MB database, 2 projects, no compute-hour cap. Our state is about 4 MB.
-- **Pausing isn't a risk:** free projects pause after about 1 week of inactivity, and a watcher running every 10 minutes never gets close.
-- **Later, for the website:**
-  - a REST API (PostgREST) with row-level security, so a static site can read a public jobs view;
-  - Discord OAuth in Supabase Auth, which covers Sai's per-user features.
-
-### Design
-
-**New module `state_db.py`, about 150 lines.**
-- It is used only when the `STATE_DATABASE_URL` environment variable is set.
-- `job_utils.load_json` and `save_json` check `state_db.handles(path)`. If the file name is one of the five state files and the URL is set, the call goes to Postgres; otherwise it uses the file as today.
-- So tests, laptop dry runs and `config.json` are unaffected, and `watcher.py` and `notion_sync.py` don't change.
-
-**Schema** (created automatically on first connect):
 ```sql
-CREATE TABLE state_docs (
-    name       text PRIMARY KEY,          -- e.g. 'delivery_state.json'
-    kind       text NOT NULL CHECK (kind IN ('dict', 'value')),
-    value      jsonb,                      -- whole value when kind = 'value' (seen.json is a list)
-    updated_at timestamptz NOT NULL DEFAULT now()
+create table jobs (
+  id          text primary key,            -- existing watcher id, e.g. 'greenhouse:anthropic:123'
+  identity    text not null,               -- job_utils.job_identity, for cross-source dedupe
+  company     text not null,
+  title       text not null,
+  location    text,
+  url         text not null,
+  terms       text[] not null default '{}',
+  source      text not null,               -- greenhouse | lever | ashby | workday | simplify | vanshb03 | jobright
+  category    text,
+  first_seen  timestamptz not null default now(),
+  last_seen   timestamptz not null default now(),
+  closed_at   timestamptz                  -- set when the posting disappears
 );
-CREATE TABLE state_parts (
-    name       text NOT NULL REFERENCES state_docs (name) ON DELETE CASCADE,
-    key        text NOT NULL,              -- top-level key, e.g. 'pending', 'known_ids'
-    value      jsonb NOT NULL,
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (name, key)
+create index on jobs (first_seen desc);
+create index on jobs (identity);
+create index on jobs (lower(company));
+```
+
+### Default top companies (from the repo)
+
+```sql
+create table default_top_companies (
+  name text primary key                    -- synced from config.json "companies" + simplify.company_keywords
 );
 ```
 
-**Writes only touch what changed.**
-- A dict document is stored one row per top-level key.
-- The module remembers a sha256 of each key's value from the last load or save, and a save upserts only the keys whose hash changed. A delivery checkpoint rewrites `pending` (small), not the 1 MB `known_ids`.
-- Each save runs in one transaction.
+The pipeline syncs this table from `config.json` on every run, so editing the repo still sets the default for everyone.
 
-**Flood guard.**
-- If `seen.json` or `delivery_state.json` is missing from the database, `load` raises and the run stops. Otherwise an empty history would make every live posting look new.
-- A connection error also stops the run, and the next cron retries. It never falls back to empty state.
+### Users
 
-**Connection.**
-- `psycopg` 3 (`psycopg[binary]==3.3.9`), with `prepare_threshold=None` and `connect_timeout=20`.
-- Use the Supabase **pooler** connection string. The direct connection is IPv6-only, and GitHub runners can't reach it.
+```sql
+create table profiles (
+  user_id          uuid primary key references auth.users on delete cascade,
+  display_name     text,
+  discord_user_id  text unique,             -- filled from the Discord identity
+  email            text,
+  notify_dm        boolean not null default false,
+  notify_email     boolean not null default false,
+  created_at       timestamptz not null default now()
+);
 
-**CLI.**
-- `python3 state_db.py import --from DIR` loads the five JSON files into the database.
-- `python3 state_db.py export --to DIR` writes them back out, for backups and restores.
+create table user_preferences (            -- same fields job_utils.preference_matches already understands
+  user_id            uuid primary key references profiles on delete cascade,
+  roles              text[] not null default '{}',
+  locations          text[] not null default '{}',
+  terms              text[] not null default '{}',
+  exclude_roles      text[] not null default '{}',
+  categories         text[] not null default '{}',
+  keep_unknown_terms boolean not null default true,
+  only_top_companies boolean not null default true,   -- alert only on the user's top list
+  follow_up_days     int not null default 14
+);
+```
 
-### Steps
+### Each user's top-company list (defaults to the repo's)
 
-1. **Avy:** create a free Supabase project and copy the Session or Transaction pooler connection string. Claude asks for it on a masked Pane secret card, so it never appears in chat.
-2. **Code (on `avy-dev`):**
-   - Add `state_db.py`.
-   - Add the hook in `job_utils.load_json` / `save_json`.
-   - Add `psycopg[binary]` to `requirements.txt`.
-   - Add `tests/test_state_db.py`, which runs against Postgres when `STATE_DB_TEST_URL` is set: round trip, changed-keys-only writes, the flood guard, and import/export.
-   - Add a `postgres` service container to `test.yml` so CI runs those tests.
-   - Test locally against Homebrew Postgres, which is already installed.
-3. **Workflow:**
-   - In `watch.yml`, add `STATE_DATABASE_URL: ${{ secrets.STATE_DATABASE_URL }}` to the run env.
-   - Remove the "Load private state", "Copy private state", "Capture recovery snapshot" and "Persist private state" steps.
-   - `permissions` stays `contents: read`.
-   - Keep `concurrency: watcher` so there is only ever one writer.
-4. **Backups:**
-   - Add a new `state-backup.yml` that runs daily and on demand.
-   - It runs `state_db.py export`, then `state_snapshot.py create`, then commits to the private state repo using the existing `STATE_DEPLOY_KEY`.
-   - This keeps the restore steps in `sai_docs/07-recovery-snapshot.md` working. It's needed because the free plan has no point-in-time restore.
-5. **Cutover:**
-   1. Disable `watch.yml`.
-   2. Clone the private state repo at its latest commit and run `state_db.py import --from <clone>`.
-   3. Add `STATE_DATABASE_URL` as a secret in the `production` environment.
-   4. Merge the PR (CODEOWNERS review applies, since `.github/` changes).
-   5. Re-enable the watcher and trigger a run.
-6. **Verify over a few runs (about 30 minutes):**
-   - Runs are green and report `0 new` (no flood).
-   - `state_docs` / `state_parts` show fresh `updated_at` values.
-   - The private state repo stops getting commits from `watch.yml`.
-   - The next real posting reaches Discord, and Notion sync reports OK.
-   - The backup workflow runs once and commits an export.
+Store each user's **changes to the default** rather than a full copy, so new companies added to the repo reach everyone who hasn't removed them:
 
-**Rollback:**
-- Remove the secret and revert the `watch.yml` change.
-- To carry state back, run `state_db.py export --to <state clone>` and commit before switching back.
+```sql
+create table user_top_company_overrides (
+  user_id  uuid references profiles on delete cascade,
+  company  text not null,
+  action   text not null check (action in ('add', 'remove')),
+  primary key (user_id, company)
+);
 
-**Effort:** about 1 hour of code once the connection string exists, plus about 30 minutes of watching runs.
+create view user_top_companies as          -- effective list = default + adds - removes
+  select p.user_id, d.name as company
+    from profiles p cross join default_top_companies d
+   where not exists (select 1 from user_top_company_overrides o
+                      where o.user_id = p.user_id and o.company = d.name and o.action = 'remove')
+  union
+  select user_id, company from user_top_company_overrides where action = 'add';
+```
 
-### Pros
-- No more push races or commit churn.
-- Saves are transactional: a crash can't half-write state.
-- A small change: one new module and a two-line hook, and bot logic is untouched.
-- Tests keep using files.
-- Sets up the website (live data, auth) on the same database later.
+"Reset to default" just deletes that user's override rows.
 
-### Cons and risks
-- **New external dependency:** if Supabase is down, that run fails and the next cron retries.
-- **Free-plan limits:** no point-in-time restore (covered by the daily export), and Pro costs $25/month if the website grows.
-- **Not truly relational yet:** the data is stored as JSON documents. Per-user website features will want real tables (see Later).
-- **Import risk:** a bad import could flood Discord. This is mitigated by the flood guard, disabling the watcher during import, and checking that the first run reports `0 new`.
+### Each user's job tracker (saved, applied, and when)
 
-## Later (not in this change)
+One table holds everyone's rows. Row-level security makes each user see only their own, which behaves like a private table per user without creating thousands of tables.
 
-- **Real tables:** `jobs`, `deliveries`, `discord_messages`, `source_health`, `runs`, plus Notion tables. These replace the JSON documents, with retention rules for old jobs and dead deliveries.
-- **Persist `jobs.json`:** route it through `state_db` too (one more name in `STATE_FILES`) so `first_seen` survives, or expose it as a `public_jobs` view for the site.
-- **Website reads:** point `web/jobs.js` `DATA_URL` at the Supabase REST endpoint, with a read-only RLS policy.
-- **Per-user features:** Supabase Auth with Discord as the provider, for saved and applied jobs.
+```sql
+create type application_status as enum
+  ('saved', 'applied', 'interviewing', 'offer', 'rejected', 'withdrawn');
 
-## Alternatives considered
+create table user_jobs (
+  user_id       uuid references profiles on delete cascade,
+  job_id        text references jobs on delete restrict,
+  status        application_status not null default 'saved',
+  saved_at      timestamptz not null default now(),
+  applied_at    timestamptz,                 -- the time they applied
+  follow_up_on  date,                        -- applied_at + follow_up_days, editable
+  notes         text,
+  source        text not null default 'web', -- web | discord_pin | discord_applied | import
+  updated_at    timestamptz not null default now(),
+  primary key (user_id, job_id)
+);
 
-| Option | Pros | Cons | Pick it when |
+create table user_job_events (             -- full history: every status change with its time
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null,
+  job_id     text not null,
+  status     application_status not null,
+  at         timestamptz not null default now()
+);
+-- trigger on user_jobs insert/update: append an event; set applied_at = now() the first time status becomes 'applied'.
+```
+
+### Alerts and bot state
+
+```sql
+create table notifications (               -- per-user alert ledger (dedupe + retries)
+  user_id   uuid references profiles on delete cascade,
+  job_id    text references jobs,
+  channel   text check (channel in ('dm', 'email')),
+  status    text not null default 'pending' check (status in ('pending', 'sent', 'dead')),
+  attempts  int not null default 0,
+  error     text,
+  sent_at   timestamptz,
+  primary key (user_id, job_id, channel)
+);
+```
+
+The watcher's internal state also moves into Supabase as JSON documents: the delivery ledger, health, the Discord message map and the Notion state. They go into `state_docs` / `state_parts`, exactly as in the earlier quick-move design.
+- `job_utils.load_json` / `save_json` route the five state files there when `STATE_DATABASE_URL` is set.
+- Only the changed top-level keys are written.
+- A flood guard refuses to run if the history is missing.
+
+This lets the bot move with no logic changes, and those documents can become real tables later.
+
+### Row-level security
+
+| Table | Anonymous visitors | Signed-in user | Pipeline (service key) |
 |---|---|---|---|
-| **Stay on JSON in git, add pruning and persist `jobs.json`** | No new service, free, small change | Push races and churn stay; no backend for the site | The website stays a static list |
-| **SQLite file** in the private repo or R2 | SQL and transactions, no vendor | A binary file in git bloats worse than JSON; R2 needs locking; the site can't query it | You want SQL but no vendor |
-| **Turso** (hosted SQLite): about 5 GB, 500M reads and 10M writes a month free | SQLite semantics, generous free tier | Turso is joining Supabase, so its roadmap is unclear; no built-in auth or REST | You prefer SQLite and will build an API |
-| **Cloudflare D1:** 5 GB, 5M reads and 100k writes a day free, 500 MB per database | The pinger is already a Worker; pairs with Cloudflare Pages | Python on Actions must use D1's REST API; 100k writes a day is tight (about 700 rows per run) | Everything moves to Cloudflare |
-| **Neon** (serverless Postgres): 1 GB and 100 compute-hours a month free | Postgres, branching | A run every 10 minutes keeps compute awake about 60% of the time, roughly 110 compute-hours a month, over the free 100 | Cron goes hourly, or on a paid plan |
-| **Firebase / MongoDB Atlas** | JSON-shaped | Poor fit for relational data (jobs ↔ deliveries ↔ users) | Not recommended |
+| `jobs`, `default_top_companies` | read | read | write |
+| `profiles`, `user_preferences`, `user_top_company_overrides`, `user_jobs`, `user_job_events` | none | own rows: read and write | read and write |
+| `notifications`, `state_docs`, `state_parts` | none | none | read and write |
 
-Free-tier numbers change often; check them before committing. Sources:
-- [Supabase pricing](https://supabase.com/pricing)
-- [Supabase pausing FAQ](https://supabase.com/kb/faqs/platform/free-project-pausing)
-- [Neon free plan](https://neon.com/faqs/free-plan-limits-and-quotas)
-- [Turso pricing](https://turso.tech/pricing)
-- [Cloudflare D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/)
+A trigger on `auth.users` insert creates the `profiles` and `user_preferences` rows and copies the Discord ID from the identity data.
 
-## Open questions for Avy and Sai
+## Pipeline changes (watcher)
 
-- Will the website have per-user features soon? If yes, do the real-tables step right after this change.
-- Who owns the Supabase project? Avy's account is assumed. Add Sai as a member if he needs to read data.
-- Where will the website be hosted (Vercel, Netlify or Cloudflare Pages)? This decides how the site reads jobs.
+Each run:
+1. **Sync** `default_top_companies` from `config.json`.
+2. **Fetch boards** (unchanged) and **upsert `jobs`**: set `last_seen`, never overwrite `first_seen`, and set `closed_at` on postings that are gone.
+3. **Post to the global channels** exactly as today (`watcher.deliver`, via the state documents).
+4. **Per-user alerts.** Load every user's preferences and effective top list in one query, run `job_utils.preference_matches(job, prefs)` (reused unchanged) on each new job plus an optional top-list check, then insert `notifications` rows.
+5. **Send** with a per-run budget and a per-user cap. DMs use the bot token: `POST /users/@me/channels`, then `POST /channels/{id}/messages`. Error 50007 means DMs are closed, so the alert is marked dead with no retry. Email uses the existing SMTP code.
+6. **Bridge Discord into the tracker.** For 📌 reactions and `#applied` links, look up `profiles.discord_user_id` and upsert `user_jobs` (`saved`, or `applied` with `applied_at`). This replaces the per-user part of Notion sync, and Notion becomes optional and legacy.
+
+**New code**
+- `state_db.py`: bot state documents.
+- `db.py`: connection and upsert helpers using `psycopg` 3 and the Supabase pooler URL.
+- `user_alerts.py`: preference matching and the notifications queue.
+
+**Edited**
+- `watcher.py`: jobs upsert, alerts and the bridge.
+- `notion_sync.py`: write to `user_jobs`.
+- `job_utils.py`: state routing.
+- `watch.yml`: secrets; drop the private-repo state steps.
+
+## Website (Next.js on Vercel)
+
+| Page | What it does |
+|---|---|
+| `/` | Job feed: search, filters (term, location, source), "Top companies only" toggle using the user's list (or the default when logged out), new-today badge, plus **Save** and **Mark applied** buttons |
+| `/login` | Discord (main) and Google buttons |
+| `/tracker` | The user's table of saved and applied jobs, sortable, with inline status edits, applied time, follow-up date, notes and CSV export |
+| `/settings` | Alert preferences, the top-company editor (search to add, remove, "reset to default", default entries marked), notification toggles, connect Discord or Google |
+
+- **Stack:** Next.js App Router, `@supabase/ssr`, Tailwind.
+- **Reuse:** the current `web/` (`app.js` filters and the `site_export` field set) as the starting point.
+
+## Build order
+
+1. **Supabase setup:** create the project, enable the Discord and Google providers, write the migrations and RLS, and add the secrets (pooler `DATABASE_URL`, service key) to the `production` environment.
+2. **Bot state to the database:** add `state_db.py`, import from the private state repo, and cut over. Watch a few runs for green and `0 new`.
+3. **Jobs table:** the pipeline upserts jobs. Backfill from the current `known_ids` and pending entries where the details exist; the feed fills naturally within about 45 days.
+4. **Website MVP:** feed, login, tracker and settings, deployed to Vercel.
+5. **Per-user alerts:** DMs and email from preferences and the top list.
+6. **Discord bridge and import:** 📌 pins and `#applied` write to `user_jobs`. Import existing Notion history (`notion_state.json` users, plus "Applied On" dates from Notion pages) as `source = 'import'`.
+7. **Hardening:**
+   - a nightly `pg_dump` to the private state repo (the free plan has no point-in-time restore);
+   - retention (close and archive old jobs; prune `notifications`);
+   - rate limits on alerts;
+   - a privacy page and account deletion (the cascade deletes are already in the schema).
+
+**Rough effort:** steps 1–3 take 2–3 days, step 4 about a week, and steps 5–6 2–3 days.
+
+## Costs and limits
+
+- **Supabase free:** 500 MB database, 50k monthly active users, pauses after 7 idle days (the pipeline keeps it active), and no point-in-time restore. Pro is $25/month when needed.
+- **Vercel Hobby:** free for personal and non-commercial use. A commercial launch needs Pro.
+- **Discord DMs:** only reach users who share a server with the bot and allow DMs. Mass unsolicited DMs get flagged. The bot needs verification at 75+ servers.
+
+## Verification
+
+- **Migrations:** apply cleanly to a local Supabase (`supabase start`).
+- **RLS:** tests with two users confirm that A can't read or write B's `user_jobs`.
+- **Pipeline:** a run against a staging project upserts jobs, keeps `first_seen` stable across runs, and a test user with a narrow filter gets exactly the matching DM.
+- **Top list:** a new user sees the default list. Adding a company to `config.json` shows it for them on the next run, but not for a user who removed it.
+- **Tracker:** "Mark applied" sets `applied_at` once and logs an event. A 📌 in Discord creates a `saved` row for the linked account.
+- **Production cutover:** three green runs, no flood, and the state repo stops receiving watcher commits.
+
+## Decisions needed
+
+- Discord-first login (recommended), or equal Discord and Google buttons?
+- Should alerts default to top companies only (recommended), or to everything matching the user's filters?
+- Will the site be public, or limited to an allowlist or Discord server members at first?
