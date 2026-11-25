@@ -170,13 +170,14 @@ function renderJob(job, now) {
 
   const main = node("div", "job-main");
   const head = node("div", "job-head");
+  // Title and badges share one inline flow so badges follow the last word.
   head.append(node("h2", "job-title", title));
-  if (board.isNew(job, now)) head.append(node("span", "badge badge-new", "New"));
+  if (board.isNew(job, now)) head.append(document.createTextNode(" "), node("span", "badge badge-new", "New"));
   if (job.top === true) {
     const top = node("span", "badge badge-top");
     top.append(icon(STAR, "badge-icon", { fill: true }), document.createTextNode("Top"));
     top.title = "Top company";
-    head.append(top);
+    head.append(document.createTextNode(" "), top);
   }
 
   const meta = node("div", "job-meta");
@@ -189,8 +190,13 @@ function renderJob(job, now) {
     window.scrollTo({ top: 0 });
     el.results.focus({ preventScroll: true });
   });
-  meta.append(companyButton, node("span", "sep", "·"));
-  meta.append(node("span", "location", text(job.location) || "Location not listed"));
+  // The dot is glued to the location with a no-break space so a wrapped
+  // company name never leaves it alone on a line.
+  const place = node("span", "location");
+  const sep = node("span", "sep", "·");
+  sep.setAttribute("aria-hidden", "true");
+  place.append(sep, document.createTextNode(`\u00a0${text(job.location) || "Location not listed"}`));
+  meta.append(companyButton, document.createTextNode(" "), place);
 
   const tags = node("ul", "tags");
   tags.setAttribute("aria-label", "Tags");
