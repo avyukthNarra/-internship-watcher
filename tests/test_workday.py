@@ -35,15 +35,51 @@ class WorkdayTests(unittest.TestCase):
                 self.assertEqual(len(watcher.fetch_workday(BOARD)), data['total'])
         data = fixture()
         a, b = data['jobPostings']
-        pages = [{'total': 2, 'jobPostings': [a]}, {'total': 0, 'jobPostings': [b]}]
-        with patch.object(watcher.requests, 'post', side_effect=[self.response(p) for p in pages]) as post:
+        with patch.object(watcher.requests, 'post', return_value=self.response({'total': 2, 'jobPostings': [a, b]})):
             jobs = watcher.fetch_workday(BOARD)
-        self.assertEqual([c.kwargs['json']['offset'] for c in post.call_args_list], [0, 20])
-        self.assertEqual(len(jobs), 2)
         with patch.object(watcher.requests, 'post', return_value=self.response({'total': 2, 'jobPostings': [b, a]})):
             reverse = watcher.fetch_workday(BOARD)
         self.assertEqual({j['id'] for j in jobs}, {j['id'] for j in reverse})
         self.assertTrue(jobs[0]['url'].startswith('https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/'))
+
+    def postings(self, start, count):
+        base = fixture()['jobPostings'][0]
+        return [{**base, 'externalPath': f'/job/Austin/Intern_{i}'} for i in range(start, start + count)]
+
+    def test_cap_returns_results_and_marks_truncated(self):
+        pages = [{'total': 200 if n == 0 else 0, 'jobPostings': self.postings(n * 20, 20)} for n in range(5)]
+        with patch.object(watcher.requests, 'post', side_effect=[self.response(p) for p in pages]) as post, patch.object(watcher.time, 'sleep') as sleep:
+            jobs = watcher.fetch_workday(BOARD)
+        self.assertEqual(len(jobs), 100)
+        self.assertEqual([c.kwargs['json']['offset'] for c in post.call_args_list], [0, 20, 40, 60, 80])
+        self.assertEqual(sleep.call_count, 4)
+        self.assertTrue(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['truncated'])
+        with patch.object(watcher.requests, 'post', return_value=self.response({'total': 0, 'jobPostings': []})):
+            self.assertEqual(watcher.fetch_workday(BOARD), [])
+        self.assertNotIn('truncated', watcher.SOURCE_HEALTH[board_url('workday', BOARD)])
+
+    def test_overlap_skipped_and_later_total_ignored(self):
+        pages = [{'total': 21, 'jobPostings': self.postings(0, 20)},
+                 {'total': 0, 'jobPostings': self.postings(19, 2)}]
+        with patch.object(watcher.requests, 'post', side_effect=[self.response(p) for p in pages]), patch.object(watcher.time, 'sleep'):
+            jobs = watcher.fetch_workday(BOARD)
+        self.assertEqual(len(jobs), 21)
+        self.assertTrue(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['ok'])
+
+    def test_duplicate_page_fails(self):
+        items = self.postings(0, 20)
+        pages = [{'total': 40, 'jobPostings': items}, {'total': 0, 'jobPostings': items}]
+        with patch.object(watcher.requests, 'post', side_effect=[self.response(p) for p in pages]), patch.object(watcher.time, 'sleep'):
+            self.assertEqual(watcher.fetch_workday(BOARD), [])
+        self.assertEqual(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['error'], 'Repeated pagination page')
+
+    def test_http_error_not_retried(self):
+        for status in (429, 503):
+            with self.subTest(status=status), patch.object(watcher.requests, 'post', return_value=Mock(status_code=status)) as post, patch.object(watcher.time, 'sleep') as sleep:
+                self.assertEqual(watcher.fetch_workday(BOARD), [])
+                self.assertEqual(post.call_count, 1)
+                sleep.assert_not_called()
+                self.assertEqual(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['error'], f'HTTP {status}')
 
     def test_dates(self):
         now = datetime(2026, 11, 24, tzinfo=timezone.utc)
@@ -52,17 +88,20 @@ class WorkdayTests(unittest.TestCase):
                                ('unknown', None), (None, None)]:
             self.assertEqual(watcher.workday_posted_date(text, now), expected)
 
-    def test_malformed_or_incomplete_pages_are_unhealthy(self):
+    def test_malformed_envelope_fails_but_bad_postings_are_skipped(self):
         good = fixture()['jobPostings'][0]
         bad = copy.deepcopy(good)
         del bad['externalPath']
-        for data in ({}, {'total': 1, 'jobPostings': [bad]}, {'total': 1, 'jobPostings': []}):
+        for data in ({}, {'total': 1, 'jobPostings': None}, {'jobPostings': []}):
             with self.subTest(data=data), patch.object(watcher.requests, 'post', return_value=self.response(data)):
                 self.assertEqual(watcher.fetch_workday(BOARD), [])
                 self.assertFalse(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['ok'])
-        with patch.object(watcher, 'WORKDAY_PAGE_CAP', 1), patch.object(watcher.requests, 'post', return_value=self.response({'total': 2, 'jobPostings': [good]})):
+        with patch.object(watcher.requests, 'post', return_value=self.response({'total': 3, 'jobPostings': [bad, None, good]})):
+            self.assertEqual(len(watcher.fetch_workday(BOARD)), 1)
+            self.assertTrue(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['ok'])
+        with patch.object(watcher.requests, 'post', return_value=self.response({'total': 50, 'jobPostings': []})):
             self.assertEqual(watcher.fetch_workday(BOARD), [])
-            self.assertFalse(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['ok'])
+            self.assertTrue(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['ok'])
 
     def test_discover_records_exception_at_board_url(self):
         company = {'name': 'NVIDIA', 'ats': 'workday', 'tenant': 'nvidia',

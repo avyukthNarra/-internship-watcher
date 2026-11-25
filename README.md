@@ -190,4 +190,4 @@ See [IMPROVEMENTS.md](IMPROVEMENTS.md) for prioritized maintenance suggestions a
 - Deleting state files causes history to be reconsidered. Preserve `seen.json`, `delivery_state.json`, `message_map.json`, and `notion_state.json` unless you intentionally want to reprocess work.
 - Old Notion rows and saved history remain valid. Rows whose URL was previously damaged by an older version are not automatically reconstructed.
 
-Workday company entries use `ats: "workday"` with `tenant`, `site`, and `host` (for example `wd5`). The verifier accepts `--candidate workday TENANT/SITE/HOST` and `--company NAME`. Workday searches for `intern`; relative posting dates are approximate and may be unavailable.
+Workday company entries use `ats: "workday"` with `tenant`, `site`, and `host` (for example `wd5`). The verifier accepts `--candidate workday TENANT/SITE/HOST` and `--company NAME`. Workday searches for `intern` and is relevance-capped at the first 100 search results per tenant; enabled aggregate feeds provide backup coverage. Relative posting dates are approximate and may be unavailable.

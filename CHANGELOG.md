@@ -8,6 +8,8 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 
 ## [Unreleased]
 
+- Workday scans now stop after the first 100 relevance-ranked search results and do not retry rate-limit or server errors.
+
 - Added a paginated Workday source and verifier support; configured the verified NVIDIA, Salesforce, Adobe, Blue Origin, and Boston Dynamics boards.
 
 ### Added
