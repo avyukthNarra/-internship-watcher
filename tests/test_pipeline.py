@@ -34,6 +34,9 @@ class PipelineTests(unittest.TestCase):
             "max_discord_per_run": 50,
         }
         (self.root / "config.json").write_text(json.dumps(self.cfg))
+        # The original pipeline tests exercise an already-watched board.
+        (self.root / "delivery_state.json").write_text(json.dumps({
+            "seeded_sources": ["greenhouse:acme", "greenhouse:good", "greenhouse:broken"]}))
 
     @staticmethod
     def response(status=200):
@@ -211,6 +214,59 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(state["pending"], {})
         self.assertEqual(notify.call_count, 1)
         self.assertEqual(sync.call_count, 2)
+
+    def test_new_board_seeds_all_jobs_then_delivers_later_posting(self):
+        (self.root / "delivery_state.json").write_text('{"seeded_sources": []}')
+        first = self.response()
+        first.json.return_value["jobs"].append({"id": 18, "title": "Engineer", "location": {},
+                                               "absolute_url": "https://example.com/18"})
+        second = self.response()
+        second.json.return_value["jobs"].append({"id": 19, "title": "Intern", "location": {},
+                                                "absolute_url": "https://example.com/19"})
+        notify = Mock(side_effect=lambda hook, jobs: ([{"mid": "m", "cid": "c", "ts": 1, "job": jobs[0]}], set()))
+        contexts = self.run_with_source([first, second], notify, Mock(return_value=True))
+        with contexts[0], contexts[1], contexts[2], contexts[3] as log, contexts[4], contexts[5], \
+             patch.dict(os.environ, {"SMTP_USER": "user", "SMTP_PASS": "pass"}), \
+             patch.object(watcher, "notify_email") as email:
+            self.assertEqual(watcher.main([]), 0)
+            state = json.loads((self.root / "delivery_state.json").read_text())
+            self.assertEqual(state["seeded_sources"], ["greenhouse:acme"])
+            self.assertIn("greenhouse:acme:18", state["known_ids"])
+            notify.assert_not_called()
+            log.assert_not_called()
+            email.assert_not_called()
+            self.assertEqual(watcher.main([]), 0)
+        self.assertEqual(notify.call_count, 1)
+        self.assertEqual(notify.call_args.args[1][0]["id"], "greenhouse:acme:19")
+
+    def test_failed_first_fetch_retries_silent_seed(self):
+        (self.root / "delivery_state.json").write_text('{"seeded_sources": []}')
+        notify = Mock(return_value=([], set()))
+        contexts = self.run_with_source([self.response(404), self.response()], notify, Mock(return_value=True))
+        with contexts[0], contexts[1], contexts[2], contexts[3], contexts[4], contexts[5]:
+            self.assertEqual(watcher.main([]), 0)
+            self.assertEqual(json.loads((self.root / "delivery_state.json").read_text())["seeded_sources"], [])
+            self.assertEqual(watcher.main([]), 0)
+        self.assertEqual(json.loads((self.root / "delivery_state.json").read_text())["seeded_sources"], ["greenhouse:acme"])
+        notify.assert_not_called()
+
+    def test_migration_preserves_legacy_and_health_and_seen_boards(self):
+        companies = [{"ats": "greenhouse", "board": "acme"}, {"ats": "ashby", "board": "seen"}]
+        sources = {watcher.board_url("greenhouse", "acme"): {"ok": False}}
+        seeded = watcher.seeded_boards({}, {"ashby:seen:1"}, sources, companies)
+        self.assertIn("greenhouse:acme", seeded)
+        self.assertIn("ashby:seen", seeded)
+        legacy = json.loads(watcher.LEGACY_BOARDS_PATH.read_text())
+        self.assertTrue(set(legacy).issubset(seeded))
+        self.assertNotIn("greenhouse:browserbaseinc", seeded)
+
+    def test_dry_run_does_not_persist_seed(self):
+        (self.root / "delivery_state.json").write_text('{"seeded_sources": []}')
+        before = {p.name: p.read_bytes() for p in self.root.iterdir()}
+        contexts = self.run_with_source([self.response()], Mock(), Mock())
+        with contexts[0], contexts[1], contexts[2], contexts[3], contexts[4], contexts[5]:
+            self.assertEqual(watcher.main(["--dry-run"]), 0)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in self.root.iterdir()})
 
 
 if __name__ == "__main__":

@@ -40,6 +40,7 @@ ROOT = Path(__file__).parent
 CONFIG_PATH = ROOT / "config.json"
 SEEN_PATH = ROOT / "seen.json"
 MSG_MAP_PATH = ROOT / "message_map.json"  # discord message id -> job, for 📌 tracking
+LEGACY_BOARDS_PATH = Path(__file__).with_name("legacy_board_sources.json")
 
 SIMPLIFY_URL = (
     "https://raw.githubusercontent.com/SimplifyJobs/"
@@ -434,8 +435,16 @@ def notify_email(cfg, jobs):
 
 # -------------------------------------------------------------------- main
 
+class DiscoveredJobs(list):
+    """Filtered jobs plus successful board snapshots, before filtering."""
+    def __init__(self, jobs, boards):
+        super().__init__(jobs)
+        self.boards = boards
+
+
 def discover(cfg):
     jobs = []
+    boards = {}
     include = cfg.get("include_keywords", ["intern"])
     exclude = cfg.get("exclude_keywords", [])
 
@@ -444,7 +453,7 @@ def discover(cfg):
             fetcher = ATS_FETCHERS[c["ats"]]
             return c, fetcher(c["board"])
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
-            SOURCE_HEALTH["board:" + c.get("board", "unknown")] = {
+            SOURCE_HEALTH[board_url(c["ats"], c["board"])] = {
                 "ok": False, "error": type(exc).__name__}
             return c, []
 
@@ -452,6 +461,10 @@ def discover(cfg):
     with ThreadPoolExecutor(max_workers=16) as executor:
         for company, found in executor.map(company_jobs, cfg.get("companies", [])):
             jobs.extend({**j, "company": company["name"]} for j in found)
+            key = company["ats"] + ":" + company["board"]
+            url = board_url(company["ats"], company["board"])
+            if SOURCE_HEALTH.get(url, {}).get("ok"):
+                boards[key] = found
     for name, fetcher in (("simplify", fetch_simplify), ("vanshb03", fetch_vanshb03),
                            ("jobright", fetch_jobright)):
         if cfg.get(name, {}).get("enabled", name == "simplify"):
@@ -461,9 +474,22 @@ def discover(cfg):
                 SOURCE_HEALTH[name] = {"ok": False, "error": type(exc).__name__}
     terms = cfg.get("terms", cfg.get("simplify", {}).get("terms", []))
     jobs = [clean_job(j) for j in jobs]
-    return [j for j in jobs if matches(j["title"], include, exclude)
-            and not location_excluded(j.get("location", ""), cfg.get("exclude_locations", []))
-            and term_matches(j, terms, cfg.get("keep_unknown_terms", True))]
+    return DiscoveredJobs([j for j in jobs if matches(j["title"], include, exclude)
+                           and not location_excluded(j.get("location", ""), cfg.get("exclude_locations", []))
+                           and term_matches(j, terms, cfg.get("keep_unknown_terms", True))], boards)
+
+
+def seeded_boards(ledger, seen, previous_sources, companies):
+    """Migrate the frozen pre-feature configuration and any other known boards."""
+    if "seeded_sources" in ledger:
+        return set(ledger["seeded_sources"])
+    seeded = set(load_json(LEGACY_BOARDS_PATH, []))
+    for company in companies:
+        key = company["ats"] + ":" + company["board"]
+        if (board_url(company["ats"], company["board"]) in previous_sources
+                or any(job_id.startswith(key + ":") for job_id in seen)):
+            seeded.add(key)
+    return seeded
 
 
 def select_new(jobs, seen, ledger, now, ttl_days=DEFAULT_DEDUP_DAYS):
@@ -672,7 +698,13 @@ def main(argv=None):
     SOURCE_HEALTH.clear()
     SOURCE_HEALTH.update(previous_health.get("sources", {}))
     previous_sources = dict(SOURCE_HEALTH)
+    seeded = seeded_boards(ledger, seen, previous_sources, cfg.get("companies", []))
     all_jobs = discover(cfg)
+    for source, jobs in getattr(all_jobs, "boards", {}).items():
+        if source not in seeded:
+            seen.update(job["id"] for job in jobs)
+            seeded.add(source)
+    ledger["seeded_sources"] = sorted(seeded)
     # Fetchers replace a source record on every attempt. An unchanged object
     # belongs to a source no longer polled and must not stay in current health.
     current_sources = {url: record for url, record in SOURCE_HEALTH.items()

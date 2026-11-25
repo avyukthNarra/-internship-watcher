@@ -9,6 +9,7 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 ## [Unreleased]
 
 ### Added
+- Direct boards for Rivian, Applied Intuition, Sentry, Zscaler, Chicago Trading Co. (three boards), and XTX Markets.
 - `alert_channels`: shared Discord channels matched on `roles`, `exclude_roles`, `companies`, `locations`, `terms`, `categories`. Shipped role channels: `swe`, `data`, `research`, `ml`, `embedded`, `hardware`, `quant` (silent until their webhooks exist). Channels must set at least one include filter.
 - `vanshb03` aggregate feed (`vanshb03` config block; 3-day window).
 - `simplify.include_categories`, `category_exclude`, `category_roles`: pull whole SimplifyJobs categories (Hardware, Quant).
@@ -23,6 +24,7 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 - `sai_docs/`: context, security audit, optimizations, scraper guide, todo, owner checkout.
 
 ### Changed
+- New company boards silently record their current postings on the first successful fetch; subsequent postings can alert. Existing boards retain their behavior and aggregate feeds are unchanged.
 - Keyword matching is whole-word, so "intern" no longer matches "International".
 - `N/A`, `TBD`, `unknown`, and `none` seasons are treated as unknown (`keep_unknown_terms` decides).
 - A single stale source no longer fails the run; only broad outages (more than 5 stale sources, or 10% of sources), stuck deliveries, or sync errors do.
@@ -32,6 +34,7 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 - Expect a one-time burst of about 350 alerts on the first run after merge.
 
 ### Fixed
+- Updated Browserbase and Sword Health to their verified Greenhouse boards.
 - SMTP now verifies certificates.
 - Untrusted feed fields are cleaned; Discord link text is escaped.
 - Host checks use dot boundaries, and ATS URL parts are quoted.
