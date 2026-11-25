@@ -20,7 +20,7 @@ import ssl
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
 from functools import lru_cache
 from pathlib import Path
@@ -30,7 +30,7 @@ import requests
 
 from job_utils import (load_json, save_json, canonical_url, job_identity, clean_job,
                        fingerprint, term_matches, preference_matches)
-from job_feeds import board_url, feed_items
+from job_feeds import board_url, company_board, feed_items
 from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT, DEFAULT_MAX_DELIVERY_ATTEMPTS,
                             DEFAULT_SITE_EXPORT_DAYS, load_personal_webhooks,
                             notifications_enabled, validate_config)
@@ -83,15 +83,16 @@ CONDITIONAL_FETCH = True  # main() turns this off for dry runs so previews show 
 FULL_FETCH_INTERVAL = 3600  # always refetch in full at least hourly as a safety net
 
 
-def fetch(url, as_text=False, etag=None, track_etag=False):
+def fetch(url, as_text=False, etag=None, track_etag=False, post_json=None, retries=3):
     """GET with retries. With `etag`, sends If-None-Match and returns
     NOT_MODIFIED on HTTP 304. With `track_etag`, the response ETag is kept
     in the source record for the next run."""
     previous = SOURCE_HEALTH.get(url, {})
     headers = {**HEADERS, **({"If-None-Match": etag} if etag else {})}
-    for attempt in range(3):
+    for attempt in range(retries):
         try:
-            r = requests.get(url, headers=headers, timeout=TIMEOUT)
+            r = (requests.post(url, headers=headers, timeout=TIMEOUT, json=post_json)
+                 if post_json is not None else requests.get(url, headers=headers, timeout=TIMEOUT))
             if r.status_code == 304 and etag:
                 SOURCE_HEALTH[url] = {**previous, "ok": True, "last_success": time.time()}
                 return NOT_MODIFIED
@@ -108,7 +109,7 @@ def fetch(url, as_text=False, etag=None, track_etag=False):
                 break
         except (requests.RequestException, ValueError) as exc:
             error = type(exc).__name__
-        if attempt < 2:
+        if attempt < retries - 1:
             time.sleep(2 ** attempt)
     SOURCE_HEALTH[url] = {**previous, "ok": False, "error": error}
     print(f"  [warn] {url} -> {error}")
@@ -215,7 +216,76 @@ def fetch_ashby(org: str):
     ]
 
 
+WORKDAY_PAGE_SIZE = 20
+WORKDAY_MAX_PAGES = 5
+
+
+def workday_posted_date(value, now=None):
+    """Approximate Workday's relative date in UTC; unknown text stays unset."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip().lower()
+    days = 0 if value in ("posted today", "today") else 1 if value in ("posted yesterday", "yesterday") else None
+    match = re.fullmatch(r"(?:posted )?(\d+)\+? days? ago", value)
+    if match:
+        days = int(match.group(1))
+    if days is None or days > 365000:
+        return None
+    try:
+        return ((now or datetime.now(timezone.utc)) - timedelta(days=days)).date().isoformat()
+    except (OverflowError, ValueError):
+        return None
+
+
+def fetch_workday(board):
+    """Fetch at most five relevance-ranked Workday pages, or fail the source."""
+    tenant, site, host = board.split("/")
+    url = board_url("workday", board)
+    previous = dict(SOURCE_HEALTH.get(url, {}))
+    jobs = []
+    paths = set()
+    total = None
+    for page in range(WORKDAY_MAX_PAGES):
+        offset = page * WORKDAY_PAGE_SIZE
+        data = fetch(url, post_json={"appliedFacets": {}, "limit": WORKDAY_PAGE_SIZE,
+                                     "offset": offset, "searchText": "intern"}, retries=1)
+        if data is None:
+            SOURCE_HEALTH[url] = {**previous, "ok": False, "error": SOURCE_HEALTH[url].get("error", "Request failed")}
+            return []
+        if (not isinstance(data, dict) or not isinstance(data.get("jobPostings"), list)
+                or (page == 0 and (type(data.get("total")) is not int or data["total"] < 0))):
+            SOURCE_HEALTH[url] = {**previous, "ok": False, "error": "Unexpected feed schema"}
+            return []
+        if page == 0:
+            total = data["total"]
+        items = data["jobPostings"]
+        valid = [j for j in items if isinstance(j, dict) and isinstance(j.get("title"), str)
+                 and isinstance(j.get("externalPath"), str)
+                 and re.fullmatch(r"/job/[^?#\s]+", j["externalPath"])
+                 and isinstance(j.get("locationsText"), str)
+                 and (j.get("postedOn") is None or isinstance(j.get("postedOn"), str))]
+        if valid and all(j["externalPath"] in paths for j in valid):
+            SOURCE_HEALTH[url] = {**previous, "ok": False, "error": "Repeated pagination page"}
+            return []
+        for j in valid:
+            path = j["externalPath"]
+            if path in paths:
+                continue
+            paths.add(path)
+            jobs.append({"id": f"workday:{board}:{path}", "title": j["title"],
+                         "location": j["locationsText"],
+                         "url": canonical_url(f"https://{tenant}.{host}.myworkdayjobs.com/{site}{path}"),
+                         "posted_date": workday_posted_date(j.get("postedOn"))})
+        if len(items) < WORKDAY_PAGE_SIZE or offset + len(items) >= total:
+            return jobs
+        if page + 1 == WORKDAY_MAX_PAGES:
+            SOURCE_HEALTH[url]["truncated"] = True
+            return jobs
+        time.sleep(0.3)
+    return jobs
+
 ATS_FETCHERS = {
+    "workday": fetch_workday,
     "greenhouse": fetch_greenhouse,
     "lever": fetch_lever,
     "ashby": fetch_ashby,
@@ -453,9 +523,10 @@ def discover(cfg):
     def company_jobs(c):
         try:
             fetcher = ATS_FETCHERS[c["ats"]]
-            return c, fetcher(c["board"])
+            board = company_board(c)
+            return c, fetcher(board)
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
-            SOURCE_HEALTH[board_url(c["ats"], c["board"])] = {
+            SOURCE_HEALTH[board_url(c["ats"], company_board(c))] = {
                 "ok": False, "error": type(exc).__name__}
             return c, []
 
@@ -463,8 +534,8 @@ def discover(cfg):
     with ThreadPoolExecutor(max_workers=16) as executor:
         for company, found in executor.map(company_jobs, cfg.get("companies", [])):
             jobs.extend({**j, "company": company["name"]} for j in found)
-            key = company["ats"] + ":" + company["board"]
-            url = board_url(company["ats"], company["board"])
+            key = company["ats"] + ":" + company_board(company)
+            url = board_url(company["ats"], company_board(company))
             if SOURCE_HEALTH.get(url, {}).get("ok"):
                 boards[key] = found
     for name, fetcher in (("simplify", fetch_simplify), ("vanshb03", fetch_vanshb03),
@@ -487,8 +558,8 @@ def seeded_boards(ledger, seen, previous_sources, companies):
         return set(ledger["seeded_sources"])
     seeded = set(load_json(LEGACY_BOARDS_PATH, []))
     for company in companies:
-        key = company["ats"] + ":" + company["board"]
-        if (board_url(company["ats"], company["board"]) in previous_sources
+        key = company["ats"] + ":" + company_board(company)
+        if (board_url(company["ats"], company_board(company)) in previous_sources
                 or any(job_id.startswith(key + ":") for job_id in seen)):
             seeded.add(key)
     return seeded

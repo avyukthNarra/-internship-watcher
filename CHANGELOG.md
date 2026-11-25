@@ -8,6 +8,10 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 
 ## [Unreleased]
 
+- Workday scans now stop after the first 100 relevance-ranked search results and do not retry rate-limit or server errors.
+
+- Added a paginated Workday source and verifier support; configured the verified NVIDIA, Salesforce, Adobe, Blue Origin, and Boston Dynamics boards.
+
 ### Added
 - Direct boards for Rivian, Applied Intuition, Sentry, Zscaler, Chicago Trading Co. (three boards), and XTX Markets.
 - Public-safe `jobs.json` export for globally matching internships, with 45-day retention, bounded size, and a fictional front-end sample.

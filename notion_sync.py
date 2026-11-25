@@ -35,6 +35,7 @@ from pathlib import Path
 
 import requests
 
+from job_feeds import company_board
 from job_utils import canonical_url, job_identity, load_json, save_json
 from net_safety import host_is, safe_get_text
 from project_config import DEFAULT_FOLLOW_UP_DAYS, follow_up_days
@@ -720,7 +721,7 @@ def _config_boards():
         cfg = load_json(ROOT / "config.json", {})
     except (OSError, json.JSONDecodeError):
         return {}
-    return {c["name"].lower(): (c["ats"], c["board"])
+    return {c["name"].lower(): (c["ats"], company_board(c))
             for c in cfg.get("companies", [])}
 
 
