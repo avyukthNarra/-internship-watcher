@@ -595,8 +595,12 @@ def discover(cfg):
     print(f"Checking {len(companies)} company boards...")
     with ThreadPoolExecutor(max_workers=16) as executor:
         other_results = list(executor.map(company_jobs, others))
+    roles = _keyword_regex(tuple(r for ch in cfg.get("alert_channels", []) for r in ch.get("roles", [])))
     for company, found in other_results + [workday_jobs(c) for c in workday]:
-        jobs.extend({**j, "company": company["name"]} for j in found)
+        # Non-top boards are broad employers: keep only titles in a configured role.
+        wanted = found if company.get("top", True) or roles is None else [
+            j for j in found if roles.search((j.get("title") or "").lower())]
+        jobs.extend({**j, "company": company["name"]} for j in wanted)
         key = company["ats"] + ":" + company_board(company)
         url = board_url(company["ats"], company_board(company))
         if SOURCE_HEALTH.get(url, {}).get("ok"):
@@ -681,9 +685,14 @@ def select_new(jobs, seen, ledger, now, ttl_days=DEFAULT_DEDUP_DAYS):
 
 def destinations(job, cfg):
     result = []
-    top_names = {c["name"].lower() for c in cfg.get("companies", [])}
-    top = ((job["id"].split(":", 1)[0] in ("greenhouse", "lever", "ashby", "simplify")
-            and not job.get("via_category"))
+    companies = cfg.get("companies", [])
+    top_names = {c["name"].lower() for c in companies if c.get("top", True)}
+    # Boards marked "top": false are read directly for coverage but post to the main channel.
+    non_top = {c["name"].lower() for c in companies if not c.get("top", True)}
+    source = job["id"].split(":", 1)[0]
+    top = ((source in ("greenhouse", "lever", "ashby", "simplify")
+            and not job.get("via_category")
+            and not (source != "simplify" and job["company"].lower() in non_top))
            or job["company"].lower() in top_names
            or company_matches(job["company"], cfg.get("simplify", {}).get("company_keywords", [])))
     hook = "DISCORD_WEBHOOK_URL_TOP" if top and os.environ.get("DISCORD_WEBHOOK_URL_TOP") else "DISCORD_WEBHOOK_URL"

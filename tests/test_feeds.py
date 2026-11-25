@@ -261,6 +261,36 @@ class CategoryTests(unittest.TestCase):
             tracked = {**hardware, "company": "Google", "via_category": False}
             self.assertEqual(watcher.destinations(tracked, cfg)[0], "discord:DISCORD_WEBHOOK_URL_TOP")
 
+    def test_non_top_boards_post_to_main_channel(self):
+        cfg = {"companies": [{"name": "Broad Co", "ats": "greenhouse", "board": "b", "top": False},
+                             {"name": "Star Co", "ats": "greenhouse", "board": "s"}],
+               "simplify": {"company_keywords": []}}
+        env = {"DISCORD_WEBHOOK_URL": "d", "DISCORD_WEBHOOK_URL_TOP": "t"}
+        broad = {"id": "greenhouse:b:1", "company": "Broad Co", "title": "SWE Intern", "location": "", "url": "u"}
+        star = {**broad, "id": "greenhouse:s:1", "company": "Star Co"}
+        feed_copy = {**broad, "id": "simplify:9", "via_category": True}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(watcher.destinations(broad, cfg), ["discord:DISCORD_WEBHOOK_URL"])
+            self.assertEqual(watcher.destinations(feed_copy, cfg), ["discord:DISCORD_WEBHOOK_URL"])
+            self.assertEqual(watcher.destinations(star, cfg), ["discord:DISCORD_WEBHOOK_URL_TOP"])
+
+    def test_non_top_boards_keep_only_configured_roles(self):
+        cfg = {"companies": [{"name": "Broad Co", "ats": "greenhouse", "board": "b", "top": False},
+                             {"name": "Star Co", "ats": "greenhouse", "board": "s"}],
+               "include_keywords": ["intern"], "terms": [], "simplify": {"enabled": False},
+               "alert_channels": [{"name": "swe", "webhook_env": "DISCORD_WEBHOOK_SWE", "roles": ["software"]}]}
+        jobs = lambda board: [{"id": f"greenhouse:{board}:1", "title": "Software Intern", "location": "", "url": "https://e.test/1" + board},
+                              {"id": f"greenhouse:{board}:2", "title": "Ticketing Intern", "location": "", "url": "https://e.test/2" + board}]
+        with patch.object(watcher, "ATS_FETCHERS", {"greenhouse": jobs}):
+            found = watcher.discover(cfg)
+        self.assertEqual({j["id"] for j in found},
+                         {"greenhouse:b:1", "greenhouse:s:1", "greenhouse:s:2"})
+
+    def test_company_top_flag_is_validated(self):
+        from project_config import validate_config
+        with self.assertRaises(ValueError):
+            validate_config({"companies": [{"name": "X", "ats": "greenhouse", "board": "x", "top": "no"}]})
+
     def test_category_lists_are_validated(self):
         from project_config import validate_config
         validate_config({"companies": [], "simplify": {"include_categories": ["Hardware"]}})

@@ -42,6 +42,8 @@ def validate_config(cfg):
             raise ValueError("Every company needs name and ats strings")
         if company["ats"] not in BOARD_APIS:
             raise ValueError("Unsupported ATS: " + company["ats"])
+        if "top" in company and type(company["top"]) is not bool:
+            raise ValueError("Company top must be true or false")
         if company["ats"] == "workday":
             for key in ("tenant", "site", "host"):
                 if not isinstance(company.get(key), str) or not re.fullmatch(r"[A-Za-z0-9_-]+", company[key]):

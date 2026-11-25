@@ -10,7 +10,8 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 
 - Direct Workday scans stop after 40 relevance-ranked results and run at most hourly; Cloudflare blocks skip the remaining Workday boards without raising source-down alerts.
 - Added an optional Windows laptop fetcher and private-repository handoff for Workday, with validation, freshness checks, and setup documentation.
-- Added verified direct company boards and TOP-routing company keywords from the 120-day internship coverage review; Workday coverage now uses the 20-board cap.
+- Added 94 verified direct company boards (79 Greenhouse/Lever/Ashby, 15 Workday) and 20 TOP-routing company keywords from the 120-day internship coverage review; Workday coverage now uses the 20-board cap.
+- Company entries accept `"top": false`: the board is read directly but posts to the main channel and keeps only titles matching an alert-channel role. Most newly added boards use it.
 
 - Added a paginated Workday source and verifier support; configured the verified NVIDIA, Salesforce, Adobe, Blue Origin, and Boston Dynamics boards.
 

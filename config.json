@@ -102,11 +102,42 @@
     "apac"
   ],
   "companies": [
-    {"name": "NVIDIA", "ats": "workday", "tenant": "nvidia", "site": "NVIDIAExternalCareerSite", "host": "wd5", "max_pages": 10},
-    {"name": "Salesforce", "ats": "workday", "tenant": "salesforce", "site": "External_Career_Site", "host": "wd12"},
-    {"name": "Adobe", "ats": "workday", "tenant": "adobe", "site": "external_experienced", "host": "wd5"},
-    {"name": "Blue Origin", "ats": "workday", "tenant": "blueorigin", "site": "BlueOrigin", "host": "wd5"},
-    {"name": "Boston Dynamics", "ats": "workday", "tenant": "bostondynamics", "site": "Boston_Dynamics", "host": "wd1"},
+    {
+      "name": "NVIDIA",
+      "ats": "workday",
+      "tenant": "nvidia",
+      "site": "NVIDIAExternalCareerSite",
+      "host": "wd5",
+      "max_pages": 10
+    },
+    {
+      "name": "Salesforce",
+      "ats": "workday",
+      "tenant": "salesforce",
+      "site": "External_Career_Site",
+      "host": "wd12"
+    },
+    {
+      "name": "Adobe",
+      "ats": "workday",
+      "tenant": "adobe",
+      "site": "external_experienced",
+      "host": "wd5"
+    },
+    {
+      "name": "Blue Origin",
+      "ats": "workday",
+      "tenant": "blueorigin",
+      "site": "BlueOrigin",
+      "host": "wd5"
+    },
+    {
+      "name": "Boston Dynamics",
+      "ats": "workday",
+      "tenant": "bostondynamics",
+      "site": "Boston_Dynamics",
+      "host": "wd1"
+    },
     {
       "name": "Anthropic",
       "ats": "greenhouse",
@@ -1145,17 +1176,14 @@
     {
       "name": "Field AI",
       "ats": "lever",
-      "board": "field-ai"
+      "board": "field-ai",
+      "top": false
     },
     {
       "name": "Persona AI",
       "ats": "ashby",
-      "board": "persona.ai"
-    },
-    {
-      "name": "Atoms",
-      "ats": "greenhouse",
-      "board": "cssmerge"
+      "board": "persona.ai",
+      "top": false
     },
     {
       "name": "Samsung Research America",
@@ -1165,102 +1193,110 @@
     {
       "name": "Varda Space",
       "ats": "greenhouse",
-      "board": "vardaspace"
+      "board": "vardaspace",
+      "top": false
     },
     {
       "name": "Axon",
       "ats": "greenhouse",
-      "board": "axontalentcommunity"
+      "board": "axontalentcommunity",
+      "top": false
     },
     {
       "name": "The Nuclear Company",
       "ats": "greenhouse",
-      "board": "thenuclearcompany"
+      "board": "thenuclearcompany",
+      "top": false
     },
     {
       "name": "Analytic Partners",
       "ats": "lever",
-      "board": "analyticpartners"
+      "board": "analyticpartners",
+      "top": false
     },
     {
       "name": "Freeform",
       "ats": "greenhouse",
-      "board": "freeformfuturecorp"
+      "board": "freeformfuturecorp",
+      "top": false
     },
     {
       "name": "General Matter",
       "ats": "greenhouse",
-      "board": "generalmatter"
-    },
-    {
-      "name": "Audax Group",
-      "ats": "greenhouse",
-      "board": "audaxgroup"
-    },
-    {
-      "name": "Compeer Financial",
-      "ats": "greenhouse",
-      "board": "compeerfinancial"
+      "board": "generalmatter",
+      "top": false
     },
     {
       "name": "GrayMatter Robotics",
       "ats": "ashby",
-      "board": "graymatter-robotics"
+      "board": "graymatter-robotics",
+      "top": false
     },
     {
       "name": "CesiumAstro",
       "ats": "lever",
-      "board": "CesiumAstro"
+      "board": "CesiumAstro",
+      "top": false
     },
     {
       "name": "Fab2",
       "ats": "ashby",
-      "board": "fab2"
+      "board": "fab2",
+      "top": false
     },
     {
       "name": "AnaVation",
       "ats": "lever",
-      "board": "anavationllc"
+      "board": "anavationllc",
+      "top": false
     },
     {
       "name": "Northwood Space",
       "ats": "ashby",
-      "board": "NorthwoodSpace"
+      "board": "NorthwoodSpace",
+      "top": false
     },
     {
       "name": "C3.ai",
       "ats": "greenhouse",
-      "board": "c3ascend"
+      "board": "c3ascend",
+      "top": false
     },
     {
       "name": "K2 Space",
       "ats": "greenhouse",
-      "board": "k2spacecorporation"
+      "board": "k2spacecorporation",
+      "top": false
     },
     {
       "name": "Dev Technology Group",
       "ats": "greenhouse",
-      "board": "devtechnology"
+      "board": "devtechnology",
+      "top": false
     },
     {
       "name": "Perpay",
       "ats": "greenhouse",
-      "board": "perpay"
+      "board": "perpay",
+      "top": false
     },
     {
       "name": "Hermeus",
       "ats": "lever",
-      "board": "hermeus"
+      "board": "hermeus",
+      "top": false
     },
     {
       "name": "Apex",
       "ats": "ashby",
-      "board": "apex-technology-inc"
+      "board": "apex-technology-inc",
+      "top": false
     },
     {
       "name": "National Information Solutions Cooperative",
       "ats": "greenhouse",
-      "board": "nisc"
+      "board": "nisc",
+      "top": false
     },
     {
       "name": "Toyota Research Institute",
@@ -1270,27 +1306,32 @@
     {
       "name": "RF-SMART",
       "ats": "greenhouse",
-      "board": "rfsmart"
+      "board": "rfsmart",
+      "top": false
     },
     {
       "name": "Revel",
       "ats": "ashby",
-      "board": "revel"
+      "board": "revel",
+      "top": false
     },
     {
       "name": "Allen Control Systems",
       "ats": "ashby",
-      "board": "allen-control-systems"
+      "board": "allen-control-systems",
+      "top": false
     },
     {
       "name": "ONE Finance",
       "ats": "ashby",
-      "board": "oneapp"
+      "board": "oneapp",
+      "top": false
     },
     {
       "name": "Immuta",
       "ats": "lever",
-      "board": "immuta"
+      "board": "immuta",
+      "top": false
     },
     {
       "name": "Rocket Lab USA",
@@ -1300,52 +1341,50 @@
     {
       "name": "Veeam Software",
       "ats": "greenhouse",
-      "board": "veeamsoftware"
+      "board": "veeamsoftware",
+      "top": false
     },
     {
       "name": "ibotta",
       "ats": "ashby",
-      "board": "ibotta"
-    },
-    {
-      "name": "Stand Together",
-      "ats": "lever",
-      "board": "standtogether"
+      "board": "ibotta",
+      "top": false
     },
     {
       "name": "Klaviyo",
       "ats": "ashby",
-      "board": "f40d14d9-07f4-403d-802b-37453deccf0a"
-    },
-    {
-      "name": "National Life",
-      "ats": "greenhouse",
-      "board": "nationallifeinsurancecompany"
+      "board": "f40d14d9-07f4-403d-802b-37453deccf0a",
+      "top": false
     },
     {
       "name": "Flagship Pioneering",
       "ats": "greenhouse",
-      "board": "fspco-op012325"
+      "board": "fspco-op012325",
+      "top": false
     },
     {
       "name": "Muon Space",
       "ats": "greenhouse",
-      "board": "muonspace"
+      "board": "muonspace",
+      "top": false
     },
     {
       "name": "SharkNinja",
       "ats": "greenhouse",
-      "board": "sharkninjaoperatingllc"
+      "board": "sharkninjaoperatingllc",
+      "top": false
     },
     {
       "name": "Commonwealth Fusion Systems",
       "ats": "lever",
-      "board": "cfsenergy"
+      "board": "cfsenergy",
+      "top": false
     },
     {
       "name": "Inversion Space",
       "ats": "greenhouse",
-      "board": "inversionspace"
+      "board": "inversionspace",
+      "top": false
     },
     {
       "name": "The Allen Institute for AI",
@@ -1355,47 +1394,50 @@
     {
       "name": "Amplify",
       "ats": "ashby",
-      "board": "amplify"
-    },
-    {
-      "name": "DriveWealth",
-      "ats": "greenhouse",
-      "board": "drivewealth"
+      "board": "amplify",
+      "top": false
     },
     {
       "name": "DriveWealth",
       "ats": "ashby",
-      "board": "drivewealth"
+      "board": "drivewealth",
+      "top": false
     },
     {
       "name": "Pattern",
       "ats": "lever",
-      "board": "pattern"
+      "board": "pattern",
+      "top": false
     },
     {
       "name": "Simbe Robotics",
       "ats": "lever",
-      "board": "SimbeRobotics"
+      "board": "SimbeRobotics",
+      "top": false
     },
     {
       "name": "Hive Financial Systems",
       "ats": "greenhouse",
-      "board": "hivefinancialsystems"
+      "board": "hivefinancialsystems",
+      "top": false
     },
     {
       "name": "Skyband Systems",
       "ats": "ashby",
-      "board": "skyband systems"
+      "board": "skyband systems",
+      "top": false
     },
     {
       "name": "Astronics",
       "ats": "greenhouse",
-      "board": "astronicscorporation"
+      "board": "astronicscorporation",
+      "top": false
     },
     {
       "name": "Crystal Dynamics",
       "ats": "greenhouse",
-      "board": "crystaldynamics"
+      "board": "crystaldynamics",
+      "top": false
     },
     {
       "name": "SK hynix",
@@ -1403,61 +1445,162 @@
       "board": "skhynixmemorysolutionsamericainc"
     },
     {
-      "name": "Farmers Mutual Hail",
-      "ats": "greenhouse",
-      "board": "farmersmutualhailinsurancecompany"
-    },
-    {
       "name": "Toshiba Global Commerce Solutions",
       "ats": "greenhouse",
-      "board": "toshibaglobalcommercesolutions"
+      "board": "toshibaglobalcommercesolutions",
+      "top": false
     },
     {
       "name": "Match Group",
       "ats": "lever",
-      "board": "matchgroup"
+      "board": "matchgroup",
+      "top": false
     },
     {
       "name": "Reliable Robotics",
       "ats": "ashby",
-      "board": "reliable-robotics"
+      "board": "reliable-robotics",
+      "top": false
     },
     {
       "name": "Neros Technologies",
       "ats": "greenhouse",
-      "board": "nerostechnologies"
+      "board": "nerostechnologies",
+      "top": false
     },
     {
       "name": "Esri",
       "ats": "greenhouse",
-      "board": "studentprogram"
+      "board": "studentprogram",
+      "top": false
     },
     {
       "name": "CarGurus",
       "ats": "greenhouse",
-      "board": "ecjobb"
+      "board": "ecjobb",
+      "top": false
     },
     {
       "name": "Bandwidth",
       "ats": "greenhouse",
-      "board": "bandwidth"
+      "board": "bandwidth",
+      "top": false
     },
-    {"name":"RTX","ats":"workday","tenant":"globalhr","site":"rec_rtx_ext_gateway","host":"wd5"},
-    {"name":"Booz Allen","ats":"workday","tenant":"bah","site":"bah_jobs","host":"wd1"},
-    {"name":"Marvell","ats":"workday","tenant":"marvell","site":"MarvellCareers","host":"wd1"},
-    {"name":"Northrop Grumman","ats":"workday","tenant":"ngc","site":"Northrop_Grumman_External_Site","host":"wd1"},
-    {"name":"General Motors","ats":"workday","tenant":"generalmotors","site":"Careers_GM","host":"wd5"},
-    {"name":"GE Vernova","ats":"workday","tenant":"gevernova","site":"vernova_externalsite","host":"wd5"},
-    {"name":"The Walt Disney Company","ats":"workday","tenant":"disney","site":"disneycareerdc","host":"wd5"},
-    {"name":"CACI","ats":"workday","tenant":"caci","site":"external","host":"wd1"},
-    {"name":"GlobalFoundries","ats":"workday","tenant":"globalfoundries","site":"External","host":"wd1"},
-    {"name":"T-Mobile","ats":"workday","tenant":"tmobile","site":"External","host":"wd1"},
-    {"name":"Johnson & Johnson","ats":"workday","tenant":"jj","site":"JJ","host":"wd5"},
-    {"name":"Micron Technology","ats":"workday","tenant":"micron","site":"External","host":"wd1"},
-    {"name":"Leidos","ats":"workday","tenant":"leidos","site":"External","host":"wd5"},
-    {"name":"General Dynamics Information Technology","ats":"workday","tenant":"gdit","site":"gdit_earlytalent","host":"wd5"},
-    {"name":"Xcel Energy","ats":"workday","tenant":"xcelenergy","site":"External","host":"wd1"},
-      {
+    {
+      "name": "RTX",
+      "ats": "workday",
+      "tenant": "globalhr",
+      "site": "rec_rtx_ext_gateway",
+      "host": "wd5"
+    },
+    {
+      "name": "Booz Allen",
+      "ats": "workday",
+      "tenant": "bah",
+      "site": "bah_jobs",
+      "host": "wd1",
+      "top": false
+    },
+    {
+      "name": "Marvell",
+      "ats": "workday",
+      "tenant": "marvell",
+      "site": "MarvellCareers",
+      "host": "wd1"
+    },
+    {
+      "name": "Northrop Grumman",
+      "ats": "workday",
+      "tenant": "ngc",
+      "site": "Northrop_Grumman_External_Site",
+      "host": "wd1"
+    },
+    {
+      "name": "General Motors",
+      "ats": "workday",
+      "tenant": "generalmotors",
+      "site": "Careers_GM",
+      "host": "wd5"
+    },
+    {
+      "name": "GE Vernova",
+      "ats": "workday",
+      "tenant": "gevernova",
+      "site": "vernova_externalsite",
+      "host": "wd5",
+      "top": false
+    },
+    {
+      "name": "The Walt Disney Company",
+      "ats": "workday",
+      "tenant": "disney",
+      "site": "disneycareerdc",
+      "host": "wd5",
+      "top": false
+    },
+    {
+      "name": "CACI",
+      "ats": "workday",
+      "tenant": "caci",
+      "site": "external",
+      "host": "wd1",
+      "top": false
+    },
+    {
+      "name": "GlobalFoundries",
+      "ats": "workday",
+      "tenant": "globalfoundries",
+      "site": "External",
+      "host": "wd1"
+    },
+    {
+      "name": "T-Mobile",
+      "ats": "workday",
+      "tenant": "tmobile",
+      "site": "External",
+      "host": "wd1",
+      "top": false
+    },
+    {
+      "name": "Johnson & Johnson",
+      "ats": "workday",
+      "tenant": "jj",
+      "site": "JJ",
+      "host": "wd5",
+      "top": false
+    },
+    {
+      "name": "Micron Technology",
+      "ats": "workday",
+      "tenant": "micron",
+      "site": "External",
+      "host": "wd1"
+    },
+    {
+      "name": "Leidos",
+      "ats": "workday",
+      "tenant": "leidos",
+      "site": "External",
+      "host": "wd5",
+      "top": false
+    },
+    {
+      "name": "General Dynamics Information Technology",
+      "ats": "workday",
+      "tenant": "gdit",
+      "site": "gdit_earlytalent",
+      "host": "wd5",
+      "top": false
+    },
+    {
+      "name": "Xcel Energy",
+      "ats": "workday",
+      "tenant": "xcelenergy",
+      "site": "External",
+      "host": "wd1",
+      "top": false
+    },
+    {
       "name": "Astera Labs",
       "ats": "greenhouse",
       "board": "asteraearlycareer2027"
@@ -1465,159 +1608,154 @@
     {
       "name": "Atoms",
       "ats": "greenhouse",
-      "board": "atoms"
+      "board": "atoms",
+      "top": false
     },
     {
       "name": "Illumio",
       "ats": "ashby",
-      "board": "illumio"
+      "board": "illumio",
+      "top": false
     },
     {
       "name": "Lila Sciences",
       "ats": "greenhouse",
-      "board": "lilasciences"
+      "board": "lilasciences",
+      "top": false
     },
     {
       "name": "Terranova",
       "ats": "ashby",
-      "board": "terranova"
+      "board": "terranova",
+      "top": false
     },
     {
       "name": "DV Trading",
       "ats": "greenhouse",
-      "board": "dvtrading"
+      "board": "dvtrading",
+      "top": false
     },
     {
       "name": "Exowatt",
       "ats": "lever",
-      "board": "exowatt"
-    },
-    {
-      "name": "Gallup",
-      "ats": "greenhouse",
-      "board": "gallup"
+      "board": "exowatt",
+      "top": false
     },
     {
       "name": "Hadrian",
       "ats": "ashby",
-      "board": "hadrian-automation"
+      "board": "hadrian-automation",
+      "top": false
     },
     {
       "name": "TransMarket Group",
       "ats": "greenhouse",
-      "board": "transmarketgroup"
+      "board": "transmarketgroup",
+      "top": false
     },
     {
       "name": "Zus Health",
       "ats": "ashby",
-      "board": "zus-health"
-    },
-    {
-      "name": "AMCA",
-      "ats": "greenhouse",
-      "board": "amca"
+      "board": "zus-health",
+      "top": false
     },
     {
       "name": "Arc",
       "ats": "greenhouse",
-      "board": "arcboatcompany"
+      "board": "arcboatcompany",
+      "top": false
     },
     {
       "name": "Castelion",
       "ats": "greenhouse",
-      "board": "castelioncorporation"
+      "board": "castelioncorporation",
+      "top": false
     },
     {
       "name": "Divergent Technologies",
       "ats": "greenhouse",
-      "board": "divergent"
+      "board": "divergent",
+      "top": false
     },
     {
       "name": "Enova",
       "ats": "greenhouse",
-      "board": "enova"
-    },
-    {
-      "name": "Fussball Club Cincinnati LLC (“FC Cincinnati”)",
-      "ats": "greenhouse",
-      "board": "fccincinnati"
-    },
-    {
-      "name": "GCM Grosvenor",
-      "ats": "greenhouse",
-      "board": "gcmgrosvenor"
+      "board": "enova",
+      "top": false
     },
     {
       "name": "ID.me",
       "ats": "greenhouse",
-      "board": "idmeuniversityrecruiting"
+      "board": "idmeuniversityrecruiting",
+      "top": false
     },
     {
       "name": "Integrate",
       "ats": "ashby",
-      "board": "integrate"
+      "board": "integrate",
+      "top": false
     },
     {
       "name": "KnowBe4",
       "ats": "greenhouse",
-      "board": "knowbe4"
+      "board": "knowbe4",
+      "top": false
     },
     {
       "name": "Metalenz",
       "ats": "ashby",
-      "board": "metalenz"
-    },
-    {
-      "name": "Mom's Meals",
-      "ats": "lever",
-      "board": "momsmeals"
+      "board": "metalenz",
+      "top": false
     },
     {
       "name": "Pacific Fusion",
       "ats": "greenhouse",
-      "board": "pacificfusion"
-    },
-    {
-      "name": "ParetoHealth",
-      "ats": "greenhouse",
-      "board": "paretocaptiveservicesllc"
+      "board": "pacificfusion",
+      "top": false
     },
     {
       "name": "Pivotal Aero",
       "ats": "lever",
-      "board": "pivotal"
+      "board": "pivotal",
+      "top": false
     },
     {
       "name": "Rendezvous Robotics",
       "ats": "greenhouse",
-      "board": "rendezvousrobotics"
+      "board": "rendezvousrobotics",
+      "top": false
     },
     {
       "name": "Rugged Robotics",
       "ats": "greenhouse",
-      "board": "ruggedrobotics"
+      "board": "ruggedrobotics",
+      "top": false
     },
     {
       "name": "Scout Space",
       "ats": "greenhouse",
-      "board": "scoutspace"
+      "board": "scoutspace",
+      "top": false
     },
     {
       "name": "Stratolaunch",
       "ats": "greenhouse",
-      "board": "stratolaunch"
+      "board": "stratolaunch",
+      "top": false
     },
     {
       "name": "UiPath",
       "ats": "ashby",
-      "board": "uipath"
+      "board": "uipath",
+      "top": false
     },
     {
       "name": "Vital Lyfe",
       "ats": "ashby",
-      "board": "vital-lyfe"
+      "board": "vital-lyfe",
+      "top": false
     }
-],
+  ],
   "vanshb03": {
     "enabled": true,
     "max_age_days": 3,
@@ -1730,33 +1868,20 @@
       "American Express",
       "Nokia",
       "Johns Hopkins Applied Physics Laboratory",
-      "Navy Federal",
-      "Boston Scientific",
       "Intercontinental Exchange",
       "General Dynamics Mission Systems",
-      "Shure",
       "Keysight Technologies",
-      "Paccar",
-      "Vertiv",
-      "American Family Insurance Group",
       "Garmin",
-      "Highmark Health",
       "Hewlett Packard Enterprise",
-      "Philips",
       "Renesas Electronics",
       "Rockwell Automation",
       "onsemi",
       "Motorola",
       "Nissan Global",
-      "The Toro Company",
       "Applied Materials",
-      "The Federal Reserve System",
       "NXP Semiconductors",
-      "Bose",
-      "Corning",
       "KLA",
       "Peraton",
-      "Ralliant",
       "Sierra Nevada Corporation"
     ]
   },
