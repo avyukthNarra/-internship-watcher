@@ -31,6 +31,7 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 - `state_snapshot.py`: validates and captures immutable, checksummed state generations and restores them safely.
 
 ### Changed
+- SimplifyJobs now includes Software and AI/ML/Data categories. Aggregate feed filter changes quietly seed previously posted matches while preserving alerts for postings after the last completed scan.
 - New company boards silently record their current postings on the first successful fetch; subsequent postings can alert. Existing boards retain their behavior and aggregate feeds are unchanged.
 - Keyword matching is whole-word, so "intern" no longer matches "International".
 - `N/A`, `TBD`, `unknown`, and `none` seasons are treated as unknown (`keep_unknown_terms` decides).
@@ -38,7 +39,6 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 - A source down 5h+ opens a `source-down` GitHub issue, closed on recovery or removal, and can dispatch `source-doctor.yml` to investigate when `SOURCE_DOCTOR_ENABLED` is set.
 - Old Mission Capital moved to its Ashby board.
 - New `exclude_keywords`: civil engineering, chemical, chemistry, structural, geotechnical, hvac, welding.
-- Expect a one-time burst of about 350 alerts on the first run after merge.
 
 ### Fixed
 - Updated Browserbase and Sword Health to their verified Greenhouse boards.

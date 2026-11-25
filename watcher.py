@@ -292,10 +292,10 @@ ATS_FETCHERS = {
 }
 
 
-def _filter_digest(cfg):
+def _filter_digest(cfg, feed="simplify"):
     """Changes whenever a setting that affects which listings match changes,
     which invalidates the cached ETag."""
-    keys = ("simplify", "include_keywords", "exclude_keywords", "exclude_locations",
+    keys = (feed, "include_keywords", "exclude_keywords", "exclude_locations",
             "terms", "keep_unknown_terms")
     blob = json.dumps({k: cfg.get(k) for k in keys}, sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
@@ -329,7 +329,7 @@ def fetch_simplify(cfg):
     for j in data:
         if not j.get("active") or not j.get("is_visible", True):
             continue
-        if j.get("date_posted", 0) < cutoff:
+        if isinstance(j.get("date_posted"), (int, float)) and j["date_posted"] < cutoff:
             continue
         company = j.get("company_name", "")
         category = j.get("category") or ""
@@ -351,6 +351,7 @@ def fetch_simplify(cfg):
             "location": ", ".join(j.get("locations", [])[:3]),
             "url": j.get("url", ""),
             "category": category,
+            "date_posted": j.get("date_posted"),
         }
         if not by_company:
             job["via_category"] = True  # wanted for its category, not a company you track
@@ -375,7 +376,7 @@ def fetch_vanshb03(cfg):
     for j in source_items(feed.get("url", VANSHB03_URL)):
         if not j.get("active") or not j.get("is_visible", True):
             continue
-        if (j.get("date_posted") or 0) < cutoff:
+        if isinstance(j.get("date_posted"), (int, float)) and j["date_posted"] < cutoff:
             continue
         out.append({
             "id": f"vanshb03:{j.get('id')}",
@@ -384,6 +385,7 @@ def fetch_vanshb03(cfg):
             "title": j.get("title") or "",
             "location": ", ".join((j.get("locations") or [])[:3]),
             "url": j.get("url") or "",
+            "date_posted": j.get("date_posted"),
         })
     return out
 
@@ -434,6 +436,7 @@ def fetch_jobright(cfg):
                     "title": m["title"],
                     "location": m["location"],
                     "url": canonical_url(m["url"]),
+                    "date_posted": posted.timestamp(),
                 }
             )
         if not parsed_rows:
@@ -509,14 +512,16 @@ def notify_email(cfg, jobs):
 
 class DiscoveredJobs(list):
     """Filtered jobs plus successful board snapshots, before filtering."""
-    def __init__(self, jobs, boards):
+    def __init__(self, jobs, boards, feeds=None):
         super().__init__(jobs)
         self.boards = boards
+        self.feeds = feeds or set()
 
 
 def discover(cfg):
     jobs = []
     boards = {}
+    feeds = set()
     include = cfg.get("include_keywords", ["intern"])
     exclude = cfg.get("exclude_keywords", [])
 
@@ -542,14 +547,40 @@ def discover(cfg):
                            ("jobright", fetch_jobright)):
         if cfg.get(name, {}).get("enabled", name == "simplify"):
             try:
-                jobs.extend({**j, "agg": True} for j in fetcher(cfg))
+                before = dict(SOURCE_HEALTH)
+                jobs.extend({**j, "agg": True, "feed": name} for j in fetcher(cfg))
+                urls = ([cfg.get(name, {}).get("url", SIMPLIFY_URL if name == "simplify" else VANSHB03_URL)]
+                        if name != "jobright" else
+                        [f"https://raw.githubusercontent.com/jobright-ai/{repo}/master/README.md"
+                         for repo in cfg.get(name, {}).get("repos", [])])
+                if urls and all(SOURCE_HEALTH.get(url) is not before.get(url)
+                                and SOURCE_HEALTH.get(url, {}).get("ok") for url in urls):
+                    feeds.add(name)
             except (KeyError, TypeError, ValueError, AttributeError) as exc:
                 SOURCE_HEALTH[name] = {"ok": False, "error": type(exc).__name__}
     terms = cfg.get("terms", cfg.get("simplify", {}).get("terms", []))
     jobs = [clean_job(j) for j in jobs]
     return DiscoveredJobs([j for j in jobs if matches(j["title"], include, exclude)
                            and not location_excluded(j.get("location", ""), cfg.get("exclude_locations", []))
-                           and term_matches(j, terms, cfg.get("keep_unknown_terms", True))], boards)
+                           and term_matches(j, terms, cfg.get("keep_unknown_terms", True))], boards, feeds)
+
+
+def seed_feed_changes(jobs, seen, ledger, cfg, last_scan, successful_feeds):
+    """Seed newly matched historical jobs while retaining post-scan alerts."""
+    filters = ledger.setdefault("feed_filters", {})
+    changed = {job.get("feed") for job in jobs if job.get("feed")
+               and filters.get(job["feed"]) != _filter_digest(cfg, job["feed"])}
+    count = 0
+    for job in jobs:
+        posted = job.get("date_posted")
+        if (job.get("feed") in changed and job["id"] not in seen
+                and (not isinstance(posted, (int, float)) or not isinstance(last_scan, (int, float))
+                     or posted <= last_scan)):
+            seen.add(job["id"])
+            count += 1
+    for name in successful_feeds:
+        filters[name] = _filter_digest(cfg, name)
+    return count
 
 
 def seeded_boards(ledger, seen, previous_sources, companies):
@@ -771,6 +802,9 @@ def main(argv=None):
     SOURCE_HEALTH.clear()
     SOURCE_HEALTH.update(previous_health.get("sources", {}))
     previous_sources = dict(SOURCE_HEALTH)
+    sim_url = cfg.get("simplify", {}).get("url", SIMPLIFY_URL)
+    if sim_url in SOURCE_HEALTH and ledger.get("feed_filters", {}).get("simplify") != _filter_digest(cfg):
+        SOURCE_HEALTH[sim_url] = {**SOURCE_HEALTH.get(sim_url, {}), "filter_digest": None}
     seeded = seeded_boards(ledger, seen, previous_sources, cfg.get("companies", []))
     all_jobs = discover(cfg)
     for source, jobs in getattr(all_jobs, "boards", {}).items():
@@ -778,6 +812,9 @@ def main(argv=None):
             seen.update(job["id"] for job in jobs)
             seeded.add(source)
     ledger["seeded_sources"] = sorted(seeded)
+    quiet = seed_feed_changes(all_jobs, seen, ledger, cfg, previous_health.get("last_completed_scan"),
+                              getattr(all_jobs, "feeds", set()))
+    print(f"Quietly seeded {quiet} aggregate postings after filter changes.")
     # Fetchers replace a source record on every attempt. An unchanged object
     # belongs to a source no longer polled and must not stay in current health.
     current_sources = {url: record for url, record in SOURCE_HEALTH.items()

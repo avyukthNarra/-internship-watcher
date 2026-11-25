@@ -7,6 +7,51 @@ from unittest.mock import Mock, patch
 import watcher
 
 
+class FeedReseedTests(unittest.TestCase):
+    def test_changed_and_missing_digests_seed_old_but_deliver_new(self):
+        cfg = {"simplify": {"include_categories": ["Software"]}}
+        for stored in (None, "old-digest"):
+            with self.subTest(stored=stored):
+                ledger = {"feed_filters": {} if stored is None else {"simplify": stored}}
+                jobs = [{"id": "simplify:" + name, "feed": "simplify", "agg": True,
+                         "date_posted": date, "company": name, "title": "Intern",
+                         "url": "https://example.com/" + name}
+                        for name, date in (("old", 99), ("new", 101), ("unknown", None))]
+                seen = set()
+                self.assertEqual(watcher.seed_feed_changes(jobs, seen, ledger, cfg, 100, {"simplify"}), 2)
+                self.assertEqual([j["id"] for j in watcher.select_new(jobs, seen, ledger, 102)],
+                                 ["simplify:new"])
+                self.assertEqual(ledger["feed_filters"]["simplify"], watcher._filter_digest(cfg))
+
+    def test_unchanged_digest_delivers_old_and_missing_scan_seeds(self):
+        cfg = {"vanshb03": {}}
+        job = {"id": "vanshb03:1", "feed": "vanshb03", "date_posted": 99}
+        ledger = {"feed_filters": {"vanshb03": watcher._filter_digest(cfg, "vanshb03")}}
+        seen = set()
+        self.assertEqual(watcher.seed_feed_changes([job], seen, ledger, cfg, 100, {"vanshb03"}), 0)
+        self.assertFalse(seen)
+        ledger["feed_filters"].clear()
+        self.assertEqual(watcher.seed_feed_changes([job], seen, ledger, cfg, None, set()), 1)
+        self.assertNotIn("vanshb03", ledger["feed_filters"])
+
+    def test_partial_jobright_failure_does_not_commit_digest(self):
+        cfg = {"simplify": {"enabled": False}, "jobright": {"enabled": True, "repos": ["one", "two"]}}
+        today = datetime.now(timezone.utc).strftime("%b %d")
+        row = "| **[Acme](https://acme.example)** | **[SWE Intern](https://jobright.ai/jobs/info/abc123)** | Austin, TX | x | " + today + " |"
+        def fetch(url):
+            watcher.SOURCE_HEALTH[url] = {"ok": url.endswith("/one/master/README.md")}
+            return row if watcher.SOURCE_HEALTH[url]["ok"] else None
+        watcher.SOURCE_HEALTH.clear()
+        with patch.object(watcher, "get_text", side_effect=fetch):
+            jobs = watcher.discover(cfg)
+        self.assertEqual(len(jobs), 1)
+        self.assertNotIn("jobright", jobs.feeds)
+        ledger, seen = {}, set()
+        watcher.seed_feed_changes(jobs, seen, ledger, cfg, time.time() + 1, jobs.feeds)
+        self.assertEqual(seen, {"jobright:abc123"})
+        self.assertNotIn("jobright", ledger["feed_filters"])
+
+
 class FeedFetcherTests(unittest.TestCase):
     def test_ats_fetchers_map_native_fields_and_ids(self):
         greenhouse = {
@@ -142,7 +187,7 @@ class Vanshb03Tests(unittest.TestCase):
                 self.listing("hid", is_visible=False),
                 self.listing("old", date_posted=time.time() - 30 * 86400),
                 self.listing("undated", date_posted=None)]
-        self.assertEqual([j["id"] for j in self.fetch(data)], ["vanshb03:ok"])
+        self.assertEqual([j["id"] for j in self.fetch(data)], ["vanshb03:ok", "vanshb03:undated"])
         old = self.fetch(data, max_age_days=60)
         self.assertIn("vanshb03:old", [j["id"] for j in old])
 
