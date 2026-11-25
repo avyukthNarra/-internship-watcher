@@ -3,6 +3,7 @@ param(
     [string]$ResultsDir = (Join-Path (Split-Path $PSScriptRoot -Parent) '..\internship-watcher-workday')
 )
 $ErrorActionPreference = 'Stop'
+(Get-Process -Id $PID).PriorityClass = 'BelowNormal'
 $log = Join-Path $PSScriptRoot 'workday.log'
 if ((Test-Path $log) -and (Get-Item $log).Length -ge 1MB) {
     for ($i = 4; $i -ge 1; $i--) {

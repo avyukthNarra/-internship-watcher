@@ -93,5 +93,73 @@ class HandoffTests(unittest.TestCase):
             self.assertEqual(json.loads((Path(tmp)/'workday_jobs.json').read_text()), data)
 
 
+class LaptopPagingAndBackoffTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.state = Path(self.temp.name) / 'backoff.json'
+        watcher.SOURCE_HEALTH.clear()
+        self.addCleanup(watcher.SOURCE_HEALTH.clear)
+
+    @staticmethod
+    def page(offset):
+        return Mock(status_code=200, headers={}, json=lambda: {
+            'total': 300,
+            'jobPostings': [{'externalPath': f'/job/A/{i}', 'title': 'Intern',
+                             'locationsText': 'USA'} for i in range(offset, offset + 20)]})
+
+    def test_validate_max_pages(self):
+        from project_config import validate_config
+        for value in (1, 5, 10):
+            validate_config({'companies': [{**COMPANY, 'max_pages': value}]})
+        for value in (0, 11, -1, True, 2.5, '5', None):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                validate_config({'companies': [{**COMPANY, 'max_pages': value}]})
+
+    def test_laptop_defaults_override_and_early_stop(self):
+        def response(*args, **kwargs):
+            return self.page(kwargs['json']['offset'])
+        for company, expected in ((COMPANY, 5), ({**COMPANY, 'max_pages': 10}, 10),
+                                  ({**COMPANY, 'max_pages': 1}, 1)):
+            with self.subTest(expected=expected), patch.object(watcher.requests, 'post', side_effect=response) as post, patch.object(watcher.time, 'sleep') as sleep:
+                data = workday_fetch.collect({'companies': [company]}, backoff_path=self.state)
+                self.assertEqual(post.call_count, expected)
+                self.assertEqual(len(data['boards'][BOARD]['jobs']), expected * 20)
+                self.assertEqual(sleep.call_count, expected - 1)
+                self.assertTrue(all(call.args == (1,) for call in sleep.call_args_list))
+        with patch.object(watcher.requests, 'post', return_value=Mock(status_code=200, headers={}, json=lambda: {'total': 0, 'jobPostings': []})) as post:
+            workday_fetch.collect({'companies': [COMPANY]}, backoff_path=self.state)
+            self.assertEqual(post.call_count, 1)
+
+    def test_backoff_persistence_stops_requests_and_resets(self):
+        other = {**COMPANY, 'tenant': 'other'}
+        cfg = {'companies': [COMPANY, other]}
+        block = Mock(status_code=429, headers={'Retry-After': '4000'})
+        with patch('time.time', return_value=10000), patch.object(watcher.requests, 'post', return_value=block) as post, patch.object(watcher.time, 'sleep'):
+            result = workday_fetch.collect(cfg, backoff_path=self.state)
+            self.assertEqual(post.call_count, 1)
+            self.assertFalse(result['boards']['other/NVIDIAExternalCareerSite/wd5']['ok'])
+            self.assertEqual(json.loads(self.state.read_text()), {'blocks': 1, 'retry_at': 14000})
+            self.assertIsNone(workday_fetch.collect(cfg, backoff_path=self.state))
+            self.assertEqual(post.call_count, 1)
+        block.headers = {'Retry-After': '0'}
+        with patch('time.time', return_value=14000), patch.object(watcher.requests, 'post', return_value=block), patch.object(watcher.time, 'sleep'):
+            workday_fetch.collect(cfg, backoff_path=self.state)
+        self.assertEqual(json.loads(self.state.read_text()), {'blocks': 2, 'retry_at': 17600})
+        good = Mock(status_code=200, headers={}, json=lambda: {'total': 0, 'jobPostings': []})
+        with patch('time.time', return_value=17600), patch.object(watcher.requests, 'post', return_value=good), patch.object(watcher.time, 'sleep'):
+            workday_fetch.collect(cfg, backoff_path=self.state)
+        self.assertEqual(json.loads(self.state.read_text()), {'blocks': 0, 'retry_at': 0})
+
+    def test_backoff_cap_and_dry_run(self):
+        workday_fetch.atomic_write(self.state, {'blocks': 10, 'retry_at': 0})
+        block = Mock(status_code=403, headers={'Server': 'cloudflare', 'Content-Type': 'text/html'})
+        with patch('time.time', return_value=10000), patch.object(watcher.requests, 'post', return_value=block):
+            workday_fetch.collect({'companies': [COMPANY]}, backoff_path=self.state, dry_run=True)
+            self.assertEqual(json.loads(self.state.read_text())['blocks'], 10)
+            workday_fetch.collect({'companies': [COMPANY]}, backoff_path=self.state)
+        self.assertEqual(json.loads(self.state.read_text()), {'blocks': 11, 'retry_at': 31600})
+
+
 if __name__ == '__main__':
     unittest.main()

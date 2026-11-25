@@ -32,6 +32,8 @@ The laptop needs Python, Git, this public code, and a write-only-purpose SSH dep
    .\laptop\run_workday.ps1
    .\laptop\install_task.ps1
    ```
+   The task runs every 30 minutes by default. After a day or two, if the log shows no 429s or Cloudflare blocks, reinstall with `.\laptop\install_task.ps1 -IntervalMinutes 15`. The allowed interval is 10–60 minutes. A block stops the remaining requests and activates a persistent cooldown; dry runs do not modify that state.
+
    For different paths or a differently named private repo, pass `-WatcherDir` and `-ResultsDir` to both scripts. Task Scheduler prompts for the Windows account password for running while logged off. Use an account permitted to log on as a batch job.
 5. In Task Scheduler, run **InternshipWatcherWorkday** once, inspect Last Run Result and `laptop\workday.log`, and confirm `workday_jobs.json` and a recent commit in the private repo. Logs rotate at 1 MB with five backups. Run `laptop\uninstall_task.ps1` to remove the task.
 
@@ -39,3 +41,7 @@ Quick connectivity check (a response other than 429/Cloudflare HTML indicates a 
 ```powershell
 Invoke-WebRequest -Method Post -Uri 'https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs' -ContentType 'application/json' -Body '{"appliedFacets":{},"limit":20,"offset":0,"searchText":"intern"}'
 ```
+
+## Resource use
+
+Each task runs one short Python process at below-normal priority, typically using tens of MB of RAM and a few hundred KB of network traffic (actual use varies with the boards and results). It should have little noticeable effect on gaming.

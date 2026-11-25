@@ -102,7 +102,7 @@
     "apac"
   ],
   "companies": [
-    {"name": "NVIDIA", "ats": "workday", "tenant": "nvidia", "site": "NVIDIAExternalCareerSite", "host": "wd5"},
+    {"name": "NVIDIA", "ats": "workday", "tenant": "nvidia", "site": "NVIDIAExternalCareerSite", "host": "wd5", "max_pages": 10},
     {"name": "Salesforce", "ats": "workday", "tenant": "salesforce", "site": "External_Career_Site", "host": "wd12"},
     {"name": "Adobe", "ats": "workday", "tenant": "adobe", "site": "external_experienced", "host": "wd5"},
     {"name": "Blue Origin", "ats": "workday", "tenant": "blueorigin", "site": "BlueOrigin", "host": "wd5"},

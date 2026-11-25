@@ -15,23 +15,58 @@ from project_config import validate_config
 from workday_results import MAX_RESULTS_BYTES, validate_results
 
 HEARTBEAT_SECONDS = 2 * 3600
+LAPTOP_MAX_PAGES = 5
+BACKOFF_INITIAL = 30 * 60
+BACKOFF_MAX = 6 * 3600
+BACKOFF_PATH = watcher.ROOT / "laptop" / ".workday_backoff.json"
 
 
-def collect(config):
+def load_backoff(path):
+    try:
+        data = json.loads(Path(path).read_text(encoding='utf-8'))
+    except FileNotFoundError:
+        return {'blocks': 0, 'retry_at': 0}
+    if (not isinstance(data, dict) or type(data.get('blocks')) is not int
+            or data['blocks'] < 0 or type(data.get('retry_at')) not in (int, float)
+            or not 0 <= data['retry_at'] < 1e12):
+        raise ValueError('Invalid laptop backoff state; inspect the state file')
+    return data
+
+
+def collect(config, *, backoff_path=BACKOFF_PATH, dry_run=False):
     companies = [c for c in config['companies'] if c['ats'] == 'workday']
+    state = load_backoff(backoff_path)
+    now = time.time()
+    if now < state['retry_at']:
+        print(f"Workday backoff active until {datetime.fromtimestamp(state['retry_at'], timezone.utc).isoformat()}")
+        return None
     boards = {}
+    blocked = False
     for index, company in enumerate(companies):
         board = company_board(company)
+        if blocked:
+            boards[board] = {'ok': False, 'error': 'Skipped after Workday block', 'jobs': []}
+            continue
         if index:
             time.sleep(1)
         watcher.SOURCE_HEALTH.clear()
         try:
-            jobs = watcher.fetch_workday(board)
+            jobs = watcher.fetch_workday(board, max_pages=company.get('max_pages', LAPTOP_MAX_PAGES), page_delay=1)
             record = watcher.SOURCE_HEALTH.get(board_url('workday', board), {})
             ok = bool(record.get('ok'))
             boards[board] = {'ok': ok, 'error': None if ok else str(record.get('error', 'Request failed')), 'jobs': jobs if ok else []}
+            if record.get('skipped'):
+                blocked = True
+                blocks = state['blocks'] + 1
+                cooldown = min(BACKOFF_MAX, BACKOFF_INITIAL * 2 ** min(blocks - 1, 4))
+                retry_at = max(time.time() + cooldown, record.get('retry_at', 0))
+                if not dry_run:
+                    atomic_write(backoff_path, {'blocks': blocks, 'retry_at': retry_at})
+                print(f"Workday block: cooling down until {datetime.fromtimestamp(retry_at, timezone.utc).isoformat()}")
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             boards[board] = {'ok': False, 'error': type(exc).__name__, 'jobs': []}
+    if not blocked and all(result['ok'] for result in boards.values()) and state['blocks'] and not dry_run:
+        atomic_write(backoff_path, {'blocks': 0, 'retry_at': 0})
     data = {'schema': 1, 'fetched_at': datetime.now(timezone.utc).isoformat(), 'boards': boards}
     validate_results(data, [company_board(c) for c in companies])
     return data
@@ -99,7 +134,9 @@ def main(argv=None):
         parser.error('specify --out, --push, or --dry-run')
     config = json.loads(watcher.CONFIG_PATH.read_text(encoding='utf-8'))
     validate_config(config)
-    data = collect(config)
+    data = collect(config, dry_run=args.dry_run)
+    if data is None:
+        return 0
     if args.dry_run:
         print(json.dumps(data, indent=2))
     else:

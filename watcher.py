@@ -256,15 +256,15 @@ def workday_posted_date(value, now=None):
         return None
 
 
-def fetch_workday(board):
-    """Fetch at most two relevance-ranked Workday pages, or fail the source."""
+def fetch_workday(board, max_pages=WORKDAY_MAX_PAGES, page_delay=0.3):
+    """Fetch up to max_pages relevance-ranked Workday pages, or fail the source."""
     tenant, site, host = board.split("/")
     url = board_url("workday", board)
     previous = dict(SOURCE_HEALTH.get(url, {}))
     jobs = []
     paths = set()
     total = None
-    for page in range(WORKDAY_MAX_PAGES):
+    for page in range(max_pages):
         offset = page * WORKDAY_PAGE_SIZE
         data = fetch(url, post_json={"appliedFacets": {}, "limit": WORKDAY_PAGE_SIZE,
                                      "offset": offset, "searchText": "intern"}, retries=1)
@@ -297,10 +297,10 @@ def fetch_workday(board):
                          "posted_date": workday_posted_date(j.get("postedOn"))})
         if len(items) < WORKDAY_PAGE_SIZE or offset + len(items) >= total:
             return jobs
-        if page + 1 == WORKDAY_MAX_PAGES:
+        if page + 1 == max_pages:
             SOURCE_HEALTH[url]["truncated"] = True
             return jobs
-        time.sleep(0.3)
+        time.sleep(page_delay)
     return jobs
 
 ATS_FETCHERS = {

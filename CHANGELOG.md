@@ -8,12 +8,13 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 
 ## [Unreleased]
 
-- Workday scans now stop after 40 relevance-ranked results and run at most hourly; Cloudflare blocks skip the remaining Workday boards without raising source-down alerts.
+- Direct Workday scans stop after 40 relevance-ranked results and run at most hourly; Cloudflare blocks skip the remaining Workday boards without raising source-down alerts.
 - Added an optional Windows laptop fetcher and private-repository handoff for Workday, with validation, freshness checks, and setup documentation.
 
 - Added a paginated Workday source and verifier support; configured the verified NVIDIA, Salesforce, Adobe, Blue Origin, and Boston Dynamics boards.
 
 ### Added
+- Laptop Workday scans default to five pages, allow per-board `max_pages` from 1–10 (NVIDIA uses 10), and persist an escalating cooldown after blocks. The Windows task defaults to every 30 minutes and supports 10–60 minutes.
 - Direct boards for Rivian, Applied Intuition, Sentry, Zscaler, Chicago Trading Co. (three boards), and XTX Markets.
 - Public-safe `jobs.json` export for globally matching internships, with 45-day retention, bounded size, and a fictional front-end sample.
 - Static read-only internship browser in `web/` (search, company/term/location/new/top filters, newest-first sort) with fictional `sample-jobs.json`. Hosting and live data publishing wait on the owner.
