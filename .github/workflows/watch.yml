@@ -20,12 +20,12 @@ jobs:
     environment: production   # secrets live in the main-only "production" environment
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # All runtime state (seen postings, delivery queue, health, Discord and Notion IDs)
       # lives in the private internship-watcher-state repo, so the bot never pushes here.
       - name: Load private state
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: avyukthNarra/internship-watcher-state
           ssh-key: ${{ secrets.STATE_DEPLOY_KEY }}
