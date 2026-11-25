@@ -8,7 +8,7 @@ from pathlib import Path
 
 import requests
 
-from job_feeds import BOARD_APIS, board_url, feed_items
+from job_feeds import BOARD_APIS, board_url, company_board, feed_items
 from job_utils import load_json
 from project_config import validate_config
 
@@ -73,8 +73,7 @@ def main(argv=None):
         available = {company["name"].casefold() for company in cfg["companies"]}
         if requested - available:
             parser.error("Unknown configured companies: " + ", ".join(sorted(requested - available)))
-        companies = [(company["name"], company["ats"], ("/".join(company[k] for k in ("tenant", "site", "host"))
-                                                       if company["ats"] == "workday" else company["board"]))
+        companies = [(company["name"], company["ats"], company_board(company))
                      for company in cfg["companies"]
                      if not requested or company["name"].casefold() in requested]
 

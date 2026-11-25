@@ -64,12 +64,22 @@ class WorkdayTests(unittest.TestCase):
             self.assertEqual(watcher.fetch_workday(BOARD), [])
             self.assertFalse(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['ok'])
 
+    def test_discover_records_exception_at_board_url(self):
+        company = {'name': 'NVIDIA', 'ats': 'workday', 'tenant': 'nvidia',
+                   'site': 'NVIDIAExternalCareerSite', 'host': 'wd5'}
+        cfg = {'companies': [company], 'simplify': {'enabled': False}, 'jobright': {'enabled': False}}
+        with patch.dict(watcher.ATS_FETCHERS, {'workday': Mock(side_effect=ValueError('bad data'))}):
+            self.assertEqual(watcher.discover(cfg), [])
+        self.assertFalse(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['ok'])
+        self.assertNotIn('workday:' + BOARD, watcher.seeded_boards({}, set(), {}, [company]))
+        self.assertIn('workday:' + BOARD, watcher.seeded_boards({}, set(), {board_url('workday', BOARD): {}}, [company]))
+
     def test_notion_board_mapping_accepts_workday(self):
         companies = [{'name': 'NVIDIA', 'ats': 'workday', 'tenant': 'nvidia',
                       'site': 'NVIDIAExternalCareerSite', 'host': 'wd5'},
                      {'name': 'Acme', 'ats': 'greenhouse', 'board': 'acme'}]
         with patch.object(notion_sync, 'load_json', return_value={'companies': companies}):
-            self.assertEqual(notion_sync._config_boards(), {'acme': ('greenhouse', 'acme')})
+            self.assertEqual(notion_sync._config_boards(), {'acme': ('greenhouse', 'acme'), 'nvidia': ('workday', BOARD)})
 
     def test_config_and_verifier(self):
         company = {'name': 'NVIDIA', 'ats': 'workday', 'tenant': 'nvidia', 'site': 'NVIDIAExternalCareerSite', 'host': 'wd5'}

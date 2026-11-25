@@ -239,6 +239,33 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(notify.call_count, 1)
         self.assertEqual(notify.call_args.args[1][0]["id"], "greenhouse:acme:19")
 
+    def test_workday_seeds_silently_then_alerts_for_new_posting(self):
+        company = {"name": "NVIDIA", "ats": "workday", "tenant": "nvidia",
+                   "site": "NVIDIAExternalCareerSite", "host": "wd5"}
+        self.cfg["companies"] = [company]
+        (self.root / "config.json").write_text(json.dumps(self.cfg))
+        (self.root / "delivery_state.json").write_text('{"seeded_sources": []}')
+        fixture = Path(__file__).parent / "fixtures" / "workday_nvidia.json"
+        listing = json.loads(fixture.read_text())["jobPostings"][0]
+        listing["title"] = "Software Intern"
+        second = {**listing, "externalPath": "/job/Austin/Software-Intern_JR-NEW"}
+        first_response = Mock(status_code=200, json=lambda: {"total": 1, "jobPostings": [listing]})
+        second_response = Mock(status_code=200, json=lambda: {"total": 2, "jobPostings": [listing, second]})
+        notify = Mock(side_effect=lambda hook, jobs: ([{"mid": "m", "cid": "c", "ts": 1, "job": jobs[0]}], set()))
+        contexts = self.run_with_source([], notify, Mock(return_value=True))
+        with contexts[0], contexts[1], contexts[2], contexts[3] as log, contexts[4], contexts[5], \
+             patch.object(watcher.requests, "post", side_effect=[first_response, second_response]):
+            self.assertEqual(watcher.main([]), 0)
+            state = json.loads((self.root / "delivery_state.json").read_text())
+            self.assertEqual(state["seeded_sources"], ["workday:nvidia/NVIDIAExternalCareerSite/wd5"])
+            self.assertIn("workday:nvidia/NVIDIAExternalCareerSite/wd5:" + listing["externalPath"], state["known_ids"])
+            notify.assert_not_called()
+            log.assert_not_called()
+            self.assertEqual(watcher.main([]), 0)
+        self.assertEqual(notify.call_count, 1)
+        self.assertEqual(notify.call_args.args[1][0]["id"],
+                         "workday:nvidia/NVIDIAExternalCareerSite/wd5:" + second["externalPath"])
+
     def test_failed_first_fetch_retries_silent_seed(self):
         (self.root / "delivery_state.json").write_text('{"seeded_sources": []}')
         notify = Mock(return_value=([], set()))

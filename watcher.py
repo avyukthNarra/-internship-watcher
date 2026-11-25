@@ -30,7 +30,7 @@ import requests
 
 from job_utils import (load_json, save_json, canonical_url, job_identity, clean_job,
                        fingerprint, term_matches, preference_matches)
-from job_feeds import board_url, feed_items
+from job_feeds import board_url, company_board, feed_items
 from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT, DEFAULT_MAX_DELIVERY_ATTEMPTS,
                             load_personal_webhooks, notifications_enabled, validate_config)
 from source_health import (MAX_STALE_SOURCES, SOURCE_ALERT_AFTER, build_health,
@@ -517,10 +517,10 @@ def discover(cfg):
     def company_jobs(c):
         try:
             fetcher = ATS_FETCHERS[c["ats"]]
-            board = "/".join(c[k] for k in ("tenant", "site", "host")) if c["ats"] == "workday" else c["board"]
+            board = company_board(c)
             return c, fetcher(board)
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
-            SOURCE_HEALTH[board_url(c["ats"], c["board"])] = {
+            SOURCE_HEALTH[board_url(c["ats"], company_board(c))] = {
                 "ok": False, "error": type(exc).__name__}
             return c, []
 
@@ -528,8 +528,8 @@ def discover(cfg):
     with ThreadPoolExecutor(max_workers=16) as executor:
         for company, found in executor.map(company_jobs, cfg.get("companies", [])):
             jobs.extend({**j, "company": company["name"]} for j in found)
-            key = company["ats"] + ":" + company["board"]
-            url = board_url(company["ats"], company["board"])
+            key = company["ats"] + ":" + company_board(company)
+            url = board_url(company["ats"], company_board(company))
             if SOURCE_HEALTH.get(url, {}).get("ok"):
                 boards[key] = found
     for name, fetcher in (("simplify", fetch_simplify), ("vanshb03", fetch_vanshb03),
@@ -552,8 +552,8 @@ def seeded_boards(ledger, seen, previous_sources, companies):
         return set(ledger["seeded_sources"])
     seeded = set(load_json(LEGACY_BOARDS_PATH, []))
     for company in companies:
-        key = company["ats"] + ":" + company["board"]
-        if (board_url(company["ats"], company["board"]) in previous_sources
+        key = company["ats"] + ":" + company_board(company)
+        if (board_url(company["ats"], company_board(company)) in previous_sources
                 or any(job_id.startswith(key + ":") for job_id in seen)):
             seeded.add(key)
     return seeded

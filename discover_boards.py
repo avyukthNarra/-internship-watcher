@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 
 import requests
 
-from job_feeds import BOARD_APIS, board_url, feed_items
+from job_feeds import BOARD_APIS, board_url, company_board, feed_items
 from job_utils import load_json
 from project_config import validate_config
 
@@ -126,7 +126,7 @@ def main(argv=None):
     import watcher  # reuse the exact title filter
     include, exclude = cfg.get("include_keywords", ["intern"]), cfg.get("exclude_keywords", [])
     matcher = lambda title: watcher.matches(title, include, exclude)
-    tracked = {(c["ats"], c["board"].lower()) for c in cfg["companies"] if c["ats"] != "workday"}
+    tracked = {(c["ats"], company_board(c).lower()) for c in cfg["companies"]}
     tracked_names = {c["name"].lower() for c in cfg["companies"]}
 
     if args.yc:

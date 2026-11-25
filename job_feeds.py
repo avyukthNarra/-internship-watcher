@@ -20,6 +20,13 @@ BOARD_APIS = {
 }
 
 
+def company_board(company):
+    """Return the common board identifier for any configured company."""
+    if company["ats"] == "workday":
+        return "/".join(company[key] for key in ("tenant", "site", "host"))
+    return company["board"]
+
+
 def board_url(ats, board):
     if ats == "workday":
         tenant, site, host = board.split("/")
