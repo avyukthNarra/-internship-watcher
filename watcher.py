@@ -22,6 +22,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
+from email.utils import parsedate_to_datetime
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
@@ -31,6 +32,7 @@ import requests
 from job_utils import (load_json, save_json, canonical_url, job_identity, clean_job,
                        fingerprint, term_matches, preference_matches)
 from job_feeds import board_url, company_board, feed_items
+from workday_results import read_results
 from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT, DEFAULT_MAX_DELIVERY_ATTEMPTS,
                             DEFAULT_SITE_EXPORT_DAYS, load_personal_webhooks,
                             notifications_enabled, validate_config)
@@ -93,6 +95,22 @@ def fetch(url, as_text=False, etag=None, track_etag=False, post_json=None, retri
         try:
             r = (requests.post(url, headers=headers, timeout=TIMEOUT, json=post_json)
                  if post_json is not None else requests.get(url, headers=headers, timeout=TIMEOUT))
+            is_workday = post_json is not None and ".myworkdayjobs.com/" in url
+            cloudflare = (is_workday and "cloudflare" in str(r.headers.get("Server", "")).lower()
+                          and "html" in str(r.headers.get("Content-Type", "")).lower())
+            if is_workday and (r.status_code == 429 or cloudflare):
+                retry = r.headers.get("Retry-After", "0")
+                try:
+                    retry_at = time.time() + max(0, float(retry))
+                except (ValueError, TypeError):
+                    try:
+                        retry_at = parsedate_to_datetime(retry).timestamp()
+                    except (ValueError, TypeError, OverflowError):
+                        retry_at = time.time()
+                SOURCE_HEALTH[url] = {**previous, "ok": False, "skipped": True,
+                                      "error": f"HTTP {r.status_code}" if r.status_code == 429 else "Cloudflare block",
+                                      "retry_at": retry_at}
+                return None
             if r.status_code == 304 and etag:
                 SOURCE_HEALTH[url] = {**previous, "ok": True, "last_success": time.time()}
                 return NOT_MODIFIED
@@ -217,7 +235,8 @@ def fetch_ashby(org: str):
 
 
 WORKDAY_PAGE_SIZE = 20
-WORKDAY_MAX_PAGES = 5
+WORKDAY_MAX_PAGES = 2
+WORKDAY_INTERVAL = 3600
 
 
 def workday_posted_date(value, now=None):
@@ -238,7 +257,7 @@ def workday_posted_date(value, now=None):
 
 
 def fetch_workday(board):
-    """Fetch at most five relevance-ranked Workday pages, or fail the source."""
+    """Fetch at most two relevance-ranked Workday pages, or fail the source."""
     tenant, site, host = board.split("/")
     url = board_url("workday", board)
     previous = dict(SOURCE_HEALTH.get(url, {}))
@@ -250,7 +269,7 @@ def fetch_workday(board):
         data = fetch(url, post_json={"appliedFacets": {}, "limit": WORKDAY_PAGE_SIZE,
                                      "offset": offset, "searchText": "intern"}, retries=1)
         if data is None:
-            SOURCE_HEALTH[url] = {**previous, "ok": False, "error": SOURCE_HEALTH[url].get("error", "Request failed")}
+            SOURCE_HEALTH[url] = {**previous, **SOURCE_HEALTH[url], "ok": False, "error": SOURCE_HEALTH[url].get("error", "Request failed")}
             return []
         if (not isinstance(data, dict) or not isinstance(data.get("jobPostings"), list)
                 or (page == 0 and (type(data.get("total")) is not int or data["total"] < 0))):
@@ -530,14 +549,53 @@ def discover(cfg):
                 "ok": False, "error": type(exc).__name__}
             return c, []
 
-    print(f"Checking {len(cfg.get('companies', []))} company boards...")
+    companies = cfg.get("companies", [])
+    workday = [c for c in companies if c["ats"] == "workday"]
+    others = [c for c in companies if c["ats"] != "workday"]
+    results_path = os.environ.get("WORKDAY_RESULTS")
+    laptop = None
+    if results_path is not None:
+        try:
+            laptop = read_results(results_path, [company_board(c) for c in workday])
+        except (OSError, ValueError, TypeError, UnicodeError):
+            pass
+    blocked = False
+    retry_at = max((SOURCE_HEALTH.get(board_url("workday", company_board(c)), {}).get("retry_at", 0) for c in workday), default=0)
+    last_attempt = max((SOURCE_HEALTH.get(board_url("workday", company_board(c)), {}).get("last_attempt", 0) for c in workday), default=0)
+    def workday_jobs(c):
+        nonlocal blocked
+        board = company_board(c)
+        url = board_url("workday", board)
+        previous = SOURCE_HEALTH.get(url, {})
+        now = time.time()
+        if results_path is not None:
+            result = laptop["boards"].get(board) if laptop else None
+            if result and result["ok"]:
+                SOURCE_HEALTH[url] = {"ok": True, "last_success": now}
+                return c, result["jobs"]
+            SOURCE_HEALTH[url] = {**previous, "ok": False, "skipped": True,
+                                  "error": "laptop results stale" if laptop is None else "laptop board skipped"}
+            return c, []
+        if blocked or now < retry_at or now - last_attempt < WORKDAY_INTERVAL:
+            SOURCE_HEALTH[url] = {**previous, "ok": False, "skipped": True,
+                                  "error": "Workday blocked" if blocked or now < retry_at else "Workday hourly throttle"}
+            return c, []
+        SOURCE_HEALTH[url] = {k: v for k, v in previous.items() if k not in ("skipped", "retry_at")}
+        company, found = company_jobs(c)
+        record = SOURCE_HEALTH[url]
+        SOURCE_HEALTH[url] = {**record, "last_attempt": now}
+        blocked = bool(record.get("skipped"))
+        return company, found
+
+    print(f"Checking {len(companies)} company boards...")
     with ThreadPoolExecutor(max_workers=16) as executor:
-        for company, found in executor.map(company_jobs, cfg.get("companies", [])):
-            jobs.extend({**j, "company": company["name"]} for j in found)
-            key = company["ats"] + ":" + company_board(company)
-            url = board_url(company["ats"], company_board(company))
-            if SOURCE_HEALTH.get(url, {}).get("ok"):
-                boards[key] = found
+        other_results = list(executor.map(company_jobs, others))
+    for company, found in other_results + [workday_jobs(c) for c in workday]:
+        jobs.extend({**j, "company": company["name"]} for j in found)
+        key = company["ats"] + ":" + company_board(company)
+        url = board_url(company["ats"], company_board(company))
+        if SOURCE_HEALTH.get(url, {}).get("ok"):
+            boards[key] = found
     for name, fetcher in (("simplify", fetch_simplify), ("vanshb03", fetch_vanshb03),
                            ("jobright", fetch_jobright)):
         if cfg.get(name, {}).get("enabled", name == "simplify"):
@@ -733,7 +791,7 @@ def track_source_issues(health, previous_sources, cfg):
             close_source_issue(previous["issue"])
     opened = []
     for url, source in sorted(sources.items()):
-        if (not source.get("ok") and now - source["failing_since"] >= SOURCE_ALERT_AFTER
+        if (not source.get("ok") and not source.get("skipped") and now - source["failing_since"] >= SOURCE_ALERT_AFTER
                 and not source.get("issue") and (number := open_source_issue(url, source, cfg, now))):
             source["issue"] = number
             opened.append(number)

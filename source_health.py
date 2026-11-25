@@ -10,7 +10,11 @@ def build_health(sources, previous_sources, *, now, matching_jobs, new_jobs,
                  pending_deliveries, sync_error, dead_deliveries=0):
     sources = {url: dict(record) for url, record in sources.items()}
     for url, source in sources.items():
-        if source.get("ok"):
+        if source.get("skipped"):
+            source.pop("failing_since", None)
+            if previous_sources.get(url, {}).get("issue"):
+                source["issue"] = previous_sources[url]["issue"]
+        elif source.get("ok"):
             # Fetchers copy the previous record, so drop outage fields on recovery.
             source.pop("failing_since", None)
             source.pop("issue", None)
@@ -19,13 +23,15 @@ def build_health(sources, previous_sources, *, now, matching_jobs, new_jobs,
             source["failing_since"] = source.get("failing_since") or previous.get("failing_since") or now
             if previous.get("issue"):
                 source["issue"] = previous["issue"]
-    failures = sum(not source.get("ok") for source in sources.values())
-    stale = sum(not source.get("ok") and now - source["failing_since"] >= SOURCE_ALERT_AFTER
+    failures = sum(not source.get("ok") and not source.get("skipped") for source in sources.values())
+    skipped = sum(bool(source.get("skipped")) for source in sources.values())
+    stale = sum(not source.get("ok") and not source.get("skipped") and now - source["failing_since"] >= SOURCE_ALERT_AFTER
                 for source in sources.values())
     return {
         "last_completed_scan": now,
         "sources": sources,
-        "successful_sources": len(sources) - failures,
+        "successful_sources": len(sources) - failures - skipped,
+        "skipped_sources": skipped,
         "failed_sources": failures,
         "stale_failed_sources": stale,
         "matching_jobs": matching_jobs,
@@ -44,7 +50,9 @@ def health_summary(health):
         f"{', parked: ' + str(health['dead_deliveries']) if health.get('dead_deliveries') else ''}; sync: {health['sync_error'] or 'OK'}"
     ]
     for url, source in sorted(health["sources"].items()):
-        if not source.get("ok"):
+        if source.get("skipped"):
+            lines.append(f"- {url}: skipped ({source.get('error')})")
+        elif not source.get("ok"):
             hours = (health["last_completed_scan"] - source["failing_since"]) / 3600
             lines.append(f"- {url}: {source.get('error')} for {hours:.1f}h")
     return "\n".join(lines)

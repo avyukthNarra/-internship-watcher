@@ -47,12 +47,12 @@ class WorkdayTests(unittest.TestCase):
         return [{**base, 'externalPath': f'/job/Austin/Intern_{i}'} for i in range(start, start + count)]
 
     def test_cap_returns_results_and_marks_truncated(self):
-        pages = [{'total': 200 if n == 0 else 0, 'jobPostings': self.postings(n * 20, 20)} for n in range(5)]
+        pages = [{'total': 200 if n == 0 else 0, 'jobPostings': self.postings(n * 20, 20)} for n in range(2)]
         with patch.object(watcher.requests, 'post', side_effect=[self.response(p) for p in pages]) as post, patch.object(watcher.time, 'sleep') as sleep:
             jobs = watcher.fetch_workday(BOARD)
-        self.assertEqual(len(jobs), 100)
-        self.assertEqual([c.kwargs['json']['offset'] for c in post.call_args_list], [0, 20, 40, 60, 80])
-        self.assertEqual(sleep.call_count, 4)
+        self.assertEqual(len(jobs), 40)
+        self.assertEqual([c.kwargs['json']['offset'] for c in post.call_args_list], [0, 20])
+        self.assertEqual(sleep.call_count, 1)
         self.assertTrue(watcher.SOURCE_HEALTH[board_url('workday', BOARD)]['truncated'])
         with patch.object(watcher.requests, 'post', return_value=self.response({'total': 0, 'jobPostings': []})):
             self.assertEqual(watcher.fetch_workday(BOARD), [])

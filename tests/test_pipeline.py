@@ -261,7 +261,8 @@ class PipelineTests(unittest.TestCase):
             self.assertIn("workday:nvidia/NVIDIAExternalCareerSite/wd5:" + listing["externalPath"], state["known_ids"])
             notify.assert_not_called()
             log.assert_not_called()
-            self.assertEqual(watcher.main([]), 0)
+            with patch.object(watcher, "WORKDAY_INTERVAL", 0):
+                self.assertEqual(watcher.main([]), 0)
         self.assertEqual(notify.call_count, 1)
         self.assertEqual(notify.call_args.args[1][0]["id"],
                          "workday:nvidia/NVIDIAExternalCareerSite/wd5:" + second["externalPath"])

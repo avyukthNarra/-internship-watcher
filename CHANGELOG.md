@@ -8,7 +8,8 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 
 ## [Unreleased]
 
-- Workday scans now stop after the first 100 relevance-ranked search results and do not retry rate-limit or server errors.
+- Workday scans now stop after 40 relevance-ranked results and run at most hourly; Cloudflare blocks skip the remaining Workday boards without raising source-down alerts.
+- Added an optional Windows laptop fetcher and private-repository handoff for Workday, with validation, freshness checks, and setup documentation.
 
 - Added a paginated Workday source and verifier support; configured the verified NVIDIA, Salesforce, Adobe, Blue Origin, and Boston Dynamics boards.
 
