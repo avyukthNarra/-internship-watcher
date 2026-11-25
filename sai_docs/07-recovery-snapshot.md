@@ -36,3 +36,15 @@ Place the following steps immediately before the existing `Persist state` step i
 ## Verification and limits
 
 Synthetic tests cover round trip, hash corruption, missing files, mixed generation membership, schema mismatch, idempotent restore, and inconsistent-ledger rejection. Snapshot creation reads each source file and checks that its bytes have not changed during capture; the workflow's single-writer concurrency is still needed to avoid concurrent watcher mutations. The manifest detects accidental corruption and mixing, but it is not signed and does not defend against a party able to rewrite both the generation and manifest. Configure access controls and retention in the private store under T03.
+
+## Deployed
+
+Enabled in `watch.yml` after T03. Each run writes a generation to `snapshot/` in the private `avyukthNarra/internship-watcher-state` repo alongside the live state files, so every commit there is a validated restore point. Nothing is uploaded as an artifact. To restore (pause the watcher first):
+
+```sh
+git clone git@github.com:avyukthNarra/internship-watcher-state.git && cd internship-watcher-state
+git log --oneline            # pick the commit to go back to
+git checkout <commit> -- snapshot
+python3 ../-internship-watcher/state_snapshot.py restore --from snapshot --to .
+git commit -am "Restore state from <commit>" && git push
+```

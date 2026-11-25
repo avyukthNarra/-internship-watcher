@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}       # manual trigger button
 
 permissions:
-  contents: write             # to commit seen.json back
+  contents: read              # state lives in the private internship-watcher-state repo
   issues: write               # to open/close "source-down" issues
   actions: write              # to dispatch source-doctor.yml
 
@@ -22,8 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # notion_state.json and message_map.json hold Discord and Notion IDs, so they
-      # live in the private internship-watcher-state repo instead of this public one.
+      # All runtime state (seen postings, delivery queue, health, Discord and Notion IDs)
+      # lives in the private internship-watcher-state repo, so the bot never pushes here.
       - name: Load private state
         uses: actions/checkout@v5
         with:
@@ -33,7 +33,7 @@ jobs:
 
       - name: Copy private state into place
         id: private_state
-        run: cp .state/notion_state.json .state/message_map.json .
+        run: cp .state/seen.json .state/delivery_state.json .state/health.json .state/notion_state.json .state/message_map.json .
 
       - uses: actions/setup-python@v6
         with:
@@ -68,16 +68,30 @@ jobs:
             gh workflow run source-doctor.yml --ref main -f issue="$issue" || true
           done
 
+      # Validated recovery generation (state_snapshot.py, see sai_docs/07). It is kept in
+      # the private repo, never uploaded as an artifact: artifacts here are public.
+      - name: Capture recovery snapshot
+        id: recovery_snapshot
+        if: always() && steps.private_state.outcome == 'success'
+        run: |
+          snapshot_dir="$(python3 state_snapshot.py create --out "$RUNNER_TEMP/watcher-snapshots")"
+          echo "path=$snapshot_dir" >> "$GITHUB_OUTPUT"
+
       - name: Persist private state
         if: always() && steps.private_state.outcome == 'success'
         working-directory: .state
+        env:
+          SNAPSHOT: ${{ steps.recovery_snapshot.outputs.path }}
         run: |
-          cp ../notion_state.json ../message_map.json .
+          cp ../seen.json ../delivery_state.json ../health.json ../notion_state.json ../message_map.json .
+          if [ -n "$SNAPSHOT" ]; then
+            rm -rf snapshot && cp -R "$SNAPSHOT" snapshot
+          fi
           git config user.name "internship-watcher-bot"
           git config user.email "actions@github.com"
-          git add notion_state.json message_map.json
+          git add -A seen.json delivery_state.json health.json notion_state.json message_map.json snapshot
           git diff --cached --quiet && exit 0
-          git commit -m "Update private state"
+          git commit -m "Update state (run ${{ github.run_id }})"
           for attempt in 1 2 3; do
             git pull --rebase origin main || exit 1
             if git push origin HEAD:main; then
@@ -86,34 +100,3 @@ jobs:
             sleep 2
           done
           exit 1
-
-      - name: Persist state
-        if: always()
-        run: |
-          git config user.name "internship-watcher-bot"
-          git config user.email "actions@github.com"
-          python trim_health_noise.py || true   # skip commits that only change timestamps/counts
-          for f in seen.json delivery_state.json health.json; do
-            git add "$f" 2>/dev/null || true
-          done
-          git diff --cached --quiet || git commit -m "Update seen postings [skip ci]"
-          for attempt in 1 2 3; do
-            git pull --rebase origin main || exit 1
-            if git push origin HEAD:main; then
-              exit 0
-            fi
-            sleep 2
-          done
-          exit 1
-
-      - name: Preserve state for recovery
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: watcher-state-${{ github.run_id }}
-          retention-days: 7
-          if-no-files-found: warn
-          path: |
-            seen.json
-            delivery_state.json
-            health.json
