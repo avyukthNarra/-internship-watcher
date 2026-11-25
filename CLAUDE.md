@@ -37,7 +37,7 @@ The `internship-pinger` Cloudflare Worker is now in this repository. It triggers
 - Verify every new ATS board slug with `verify_boards.py` before adding it. Wrong slugs can 404 silently.
 - The verifier checks `config.json` by default; `--company NAME` selects an existing company and `--candidate ATS BOARD` checks a new slug without editing configuration. It exits nonzero on an HTTP or schema failure.
 - Preserve `seen.json`, `delivery_state.json`, `message_map.json`, and `notion_state.json`. Deleting them can requeue or re-alert historical jobs.
-- `message_map.json` and `notion_state.json` are private: `watch.yml` loads them from and saves them to the private `internship-watcher-state` repo (deploy key `STATE_DEPLOY_KEY`). Never commit them to this public repo.
+- All five state files are private: `watch.yml` loads them from and saves them to the private `internship-watcher-state` repo (deploy key `STATE_DEPLOY_KEY`), along with a validated `snapshot/` generation each run. The bot never pushes to this repo. Never commit state files here.
 - The workflow always uploads state artifacts with seven-day retention. Persistence runs even after watcher failures and retries rebase/push up to three times; a rebase conflict leaves the artifact available for recovery.
 - Keep retries and state checkpoints durable. A run can fail after an external service accepted a request.
 - Do not add a new feed merely because it sounds useful; inspect whether it duplicates SimplifyJobs, vanshb03, or Jobright. vanshb03 was added after measuring that most of its recent postings were not in SimplifyJobs; its links are `go.vansh.nyc` shortlinks, so URL identity cannot dedupe it.

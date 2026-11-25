@@ -152,11 +152,11 @@ These files are runtime state. GitHub Actions persists them after each run; loca
 
 | File | Contents |
 | --- | --- |
-| `seen.json` | Previously observed source posting IDs |
-| `delivery_state.json` | Known identities, 30-day fingerprints, legacy `norm:` entries ignored but retained, and pending per-destination queues |
+| `seen.json` | Previously observed source posting IDs (private: kept in the `internship-watcher-state` repo) |
+| `delivery_state.json` | Known identities, 30-day fingerprints, legacy `norm:` entries ignored but retained, and pending per-destination queues (private: kept in the `internship-watcher-state` repo) |
 | `message_map.json` | Recent Discord message IDs and jobs used for 📌 scans (private: kept in the `internship-watcher-state` repo) |
 | `notion_state.json` | Notion database IDs, users, applied cursor, `pending_applied`, and `pending_pins` (private: kept in the `internship-watcher-state` repo) |
-| `health.json` | Last completed scan, source successes/failures, matching and new counts, pending deliveries, parked (given-up) deliveries, sync errors, and the SimplifyJobs ETag cache (an unchanged feed is skipped via HTTP 304, refetched in full at least hourly and whenever filter settings change) |
+| `health.json` | Last completed scan, source successes/failures, matching and new counts, pending deliveries, parked (given-up) deliveries, sync errors, and the SimplifyJobs ETag cache (an unchanged feed is skipped via HTTP 304, refetched in full at least hourly and whenever filter settings change) (private: kept in the `internship-watcher-state` repo) |
 
 `health.json` is also the run's operational summary: a source failure, pending delivery, or Notion sync error is reported explicitly and retried through durable state. A failing source records `failing_since`. Once it has been down for 5 hours the watcher opens a `source-down` GitHub issue (closed automatically on recovery) and dispatches the `source-doctor.yml` workflow, where Claude investigates and opens a PR updating `config.json`; the run itself still succeeds. A broad outage (more than 5 stale sources, or 10% of sources), pending deliveries, and sync errors fail the run. The source doctor is off unless the repository variable `SOURCE_DOCTOR_ENABLED` is `true`, and it also needs a `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or `ANTHROPIC_API_KEY` repository secret.
 
