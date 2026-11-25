@@ -9,6 +9,7 @@ DEFAULT_DISCORD_LIMIT = 50
 DEFAULT_DEDUP_DAYS = 30
 DEFAULT_MAX_DELIVERY_ATTEMPTS = 20  # about 3 hours of 10-minute runs; 0 disables
 DEFAULT_FOLLOW_UP_DAYS = 14
+DEFAULT_SITE_EXPORT_DAYS = 45
 
 
 def _string_lists(options, keys, prefix=""):
@@ -41,7 +42,7 @@ def validate_config(cfg):
         if company["ats"] not in BOARD_APIS:
             raise ValueError("Unsupported ATS: " + company["ats"])
     _non_negative_integers(cfg, ("max_discord_per_run", "dedup_days", "follow_up_days",
-                               "max_delivery_attempts"))
+                               "max_delivery_attempts", "site_export_days"))
     _string_lists(cfg, ("terms", "include_keywords", "exclude_keywords", "exclude_locations",
                           "allowed_user_ids"))
     _booleans(cfg, ("keep_unknown_terms",))

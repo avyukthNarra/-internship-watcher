@@ -32,7 +32,9 @@ from job_utils import (load_json, save_json, canonical_url, job_identity, clean_
                        fingerprint, term_matches, preference_matches)
 from job_feeds import board_url, feed_items
 from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT, DEFAULT_MAX_DELIVERY_ATTEMPTS,
-                            load_personal_webhooks, notifications_enabled, validate_config)
+                            DEFAULT_SITE_EXPORT_DAYS, load_personal_webhooks,
+                            notifications_enabled, validate_config)
+from site_export import build_jobs_export
 from source_health import (MAX_STALE_SOURCES, SOURCE_ALERT_AFTER, build_health,
                            health_summary, health_exit_code)
 
@@ -745,7 +747,15 @@ def main(argv=None):
         sync_error=sync_error,
     )
     track_source_issues(health, previous_sources, cfg)
-    return report_health(health)
+    exit_code = report_health(health)
+    if exit_code == 0:
+        jobs_path = ROOT / "jobs.json"
+        current_export = build_jobs_export(
+            all_jobs, load_json(jobs_path, []), cfg,
+            now=now, retention_days=cfg.get("site_export_days", DEFAULT_SITE_EXPORT_DAYS),
+        )
+        save_json(jobs_path, current_export)
+    return exit_code
 
 
 if __name__ == "__main__":
