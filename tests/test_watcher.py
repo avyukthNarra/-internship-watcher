@@ -249,6 +249,16 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(before, {p.name: p.read_bytes() for p in self.root.iterdir()})
         send.assert_not_called()
 
+    def test_successful_scan_writes_public_export(self):
+        with patch.dict(os.environ, {'DISCORD_WEBHOOK_URL': 'test'}, clear=True), \
+             patch.object(watcher, 'discover', return_value=[job()]), \
+             patch.object(watcher, 'notify_discord', return_value=([], set())):
+            self.assertEqual(watcher.main([]), 0)
+        exported = load_json(self.root/'jobs.json', [])
+        self.assertEqual(len(exported), 1)
+        self.assertEqual(exported[0]['company'], 'Example')
+        self.assertNotIn('greenhouse:example:123', json.dumps(exported))
+
     def test_no_credentials_implies_dry_run(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(watcher, 'discover', return_value=[job()]):
             watcher.main([])
