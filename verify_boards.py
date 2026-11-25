@@ -8,7 +8,7 @@ from pathlib import Path
 
 import requests
 
-from job_feeds import BOARD_APIS, board_url, feed_items
+from job_feeds import BOARD_APIS, board_url, company_board, feed_items
 from job_utils import load_json
 from project_config import validate_config
 
@@ -19,6 +19,15 @@ HEADERS = {"User-Agent": "internship-watcher/1.0 (board verification)"}
 def check(company):
     """Return (name, ats, board, job count, error); -1 means verification failed."""
     name, ats, board = company
+    if ats == "workday":
+        from watcher import SOURCE_HEALTH, fetch_workday
+        try:
+            url = board_url(ats, board)
+            jobs = fetch_workday(board)
+            health = SOURCE_HEALTH.get(url, {})
+            return name, ats, board, len(jobs) if health.get("ok") else -1, health.get("error")
+        except (ValueError, KeyError, TypeError) as exc:
+            return name, ats, board, -1, type(exc).__name__
     try:
         response = requests.get(board_url(ats, board), headers=HEADERS, timeout=15)
         if response.status_code != 200:
@@ -47,6 +56,15 @@ def main(argv=None):
         for ats, board in args.candidate:
             if ats not in BOARD_APIS:
                 parser.error("Unsupported ATS: " + ats)
+        for ats, board in args.candidate:
+            if ats == "workday":
+                parts = board.split("/")
+                if len(parts) != 3:
+                    parser.error("Workday candidate must be TENANT/SITE/HOST")
+                try:
+                    validate_config({"companies": [{"name": board, "ats": ats, **dict(zip(("tenant", "site", "host"), parts))}]})
+                except ValueError as exc:
+                    parser.error(str(exc))
         companies = [(board, ats, board) for ats, board in args.candidate]
     else:
         cfg = load_json(args.config, {})
@@ -55,7 +73,7 @@ def main(argv=None):
         available = {company["name"].casefold() for company in cfg["companies"]}
         if requested - available:
             parser.error("Unknown configured companies: " + ", ".join(sorted(requested - available)))
-        companies = [(company["name"], company["ats"], company["board"])
+        companies = [(company["name"], company["ats"], company_board(company))
                      for company in cfg["companies"]
                      if not requested or company["name"].casefold() in requested]
 
