@@ -8,6 +8,7 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    environment: production   # secrets live in the main-only "production" environment
     steps:
       - name: Post test message
         env:
