@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -32,7 +33,8 @@ from job_utils import (load_json, save_json, canonical_url, job_identity, clean_
 from job_feeds import board_url, feed_items
 from project_config import (DEFAULT_DEDUP_DAYS, DEFAULT_DISCORD_LIMIT, DEFAULT_MAX_DELIVERY_ATTEMPTS,
                             load_personal_webhooks, notifications_enabled, validate_config)
-from source_health import SOURCE_ALERT_AFTER, build_health, health_summary, health_exit_code
+from source_health import (MAX_STALE_SOURCES, SOURCE_ALERT_AFTER, build_health,
+                           health_summary, health_exit_code)
 
 ROOT = Path(__file__).parent
 CONFIG_PATH = ROOT / "config.json"
@@ -72,6 +74,7 @@ def matches(title: str, include_kw, exclude_kw) -> bool:
 
 
 SOURCE_HEALTH = {}
+SOURCE_ISSUE_LABEL = "source-down"
 NOT_MODIFIED = object()  # a conditional fetch found the feed unchanged
 CONDITIONAL_FETCH = True  # main() turns this off for dry runs so previews show the full feed
 FULL_FETCH_INTERVAL = 3600  # always refetch in full at least hourly as a safety net
@@ -573,6 +576,73 @@ def queue_deliveries(ledger, jobs, seen, cfg, now):
     ledger["known_ids"] = sorted(seen)
 
 
+def github_api(method, path, payload=None):
+    """Call the repo's GitHub API from Actions; returns JSON or None when unavailable."""
+    token, repo = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY")
+    if not (token and repo):
+        return None
+    try:
+        r = requests.request(method, f"https://api.github.com/repos/{repo}/{path}", json=payload,
+                             headers={**HEADERS, "Authorization": f"Bearer {token}",
+                                      "Accept": "application/vnd.github+json"}, timeout=TIMEOUT)
+    except requests.RequestException as exc:
+        print(f"  [warn] GitHub {method} {path} -> {type(exc).__name__}")
+        return None
+    if not r.ok:
+        print(f"  [warn] GitHub {method} {path} -> HTTP {r.status_code}")
+        return None
+    return r.json() if r.content else {}
+
+
+def source_company(url, cfg):
+    segments = set(urlparse(url).path.split("/"))
+    return next((f"{c['name']} ({c.get('ats')}:{c['board']})" for c in cfg.get("companies", [])
+                 if c.get("board") in segments), url)
+
+
+def open_source_issue(url, source, cfg, now):
+    """Open one issue for a source that stayed down; returns the issue number."""
+    hours = (now - source["failing_since"]) / 3600
+    last = source.get("last_success")
+    last = datetime.fromtimestamp(last, timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if last else "never"
+    issue = github_api("POST", "issues", {
+        "title": f"Source down: {source_company(url, cfg)}",
+        "labels": [SOURCE_ISSUE_LABEL],
+        "body": (f"The watcher has failed to read this source for {hours:.1f}h.\n\n"
+                 f"- URL: {url}\n- Error: {source.get('error')}\n- Last success: {last}\n\n"
+                 "Runs keep succeeding without it. This issue closes automatically "
+                 "if the source recovers."),
+    })
+    return issue and issue.get("number")
+
+
+def close_source_issue(number, reason="Source recovered; closing."):
+    github_api("POST", f"issues/{number}/comments", {"body": reason})
+    github_api("PATCH", f"issues/{number}", {"state": "closed", "state_reason": "completed"})
+
+
+def track_source_issues(health, previous_sources, cfg):
+    """Open an issue per stale source and close issues for recovered or removed sources."""
+    now, sources = health["last_completed_scan"], health["sources"]
+    for url, previous in previous_sources.items():
+        if not previous.get("issue"):
+            continue
+        if url not in sources:
+            # A board removed from config (or moved to a new slug) is no longer fetched.
+            close_source_issue(previous["issue"], "Source no longer watched; closing.")
+        elif sources[url].get("ok"):
+            close_source_issue(previous["issue"])
+    opened = []
+    for url, source in sorted(sources.items()):
+        if (not source.get("ok") and now - source["failing_since"] >= SOURCE_ALERT_AFTER
+                and not source.get("issue") and (number := open_source_issue(url, source, cfg, now))):
+            source["issue"] = number
+            opened.append(number)
+    if opened and os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
+            stream.write(f"source_issues={' '.join(map(str, opened))}\n")
+
+
 def report_health(health):
     save_json(ROOT / "health.json", health)
     summary = health_summary(health)
@@ -642,6 +712,7 @@ def main(argv=None):
         dead_deliveries=len(ledger.get("dead", {})),
         sync_error=sync_error,
     )
+    track_source_issues(health, previous_sources, cfg)
     return report_health(health)
 
 

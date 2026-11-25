@@ -1,6 +1,8 @@
 """Build and format scan health without performing network or state writes."""
 
 SOURCE_ALERT_AFTER = 5 * 3600
+# One dead board gets a GitHub issue, not a failed run. Either limit counts as a broad outage.
+MAX_STALE_SOURCES = 5
 BROAD_OUTAGE_FRACTION = 0.10  # stale share of sources that counts as an outage
 
 
@@ -9,10 +11,14 @@ def build_health(sources, previous_sources, *, now, matching_jobs, new_jobs,
     sources = {url: dict(record) for url, record in sources.items()}
     for url, source in sources.items():
         if source.get("ok"):
+            # Fetchers copy the previous record, so drop outage fields on recovery.
             source.pop("failing_since", None)
+            source.pop("issue", None)
         else:
-            source["failing_since"] = (source.get("failing_since")
-                                       or previous_sources.get(url, {}).get("failing_since") or now)
+            previous = previous_sources.get(url, {})
+            source["failing_since"] = source.get("failing_since") or previous.get("failing_since") or now
+            if previous.get("issue"):
+                source["issue"] = previous["issue"]
     failures = sum(not source.get("ok") for source in sources.values())
     stale = sum(not source.get("ok") and now - source["failing_since"] >= SOURCE_ALERT_AFTER
                 for source in sources.values())
@@ -45,8 +51,9 @@ def health_summary(health):
 
 
 def health_exit_code(health):
-    """A few stale sources are warnings (shown in the summary); a broad outage,
-    stuck deliveries, or a sync error fail the run."""
-    total = health["successful_sources"] + health["failed_sources"]
-    broad_outage = bool(total) and health["stale_failed_sources"] / total >= BROAD_OUTAGE_FRACTION
+    """Stale sources are tracked as issues and shown in the summary; a broad outage
+    (more than MAX_STALE_SOURCES, or BROAD_OUTAGE_FRACTION of sources), stuck
+    deliveries, or a sync error fail the run."""
+    stale, total = health["stale_failed_sources"], health["successful_sources"] + health["failed_sources"]
+    broad_outage = stale > MAX_STALE_SOURCES or (bool(total) and stale / total >= BROAD_OUTAGE_FRACTION)
     return int(broad_outage or bool(health["sync_error"] or health["pending_deliveries"]))

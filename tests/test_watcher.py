@@ -320,6 +320,53 @@ class DeliveryTests(unittest.TestCase):
             self.assertEqual(watcher.main([]), 0)
         self.assertEqual(load_json(self.root/'health.json', {})['sources'], {})
 
+    def run_with_sources(self, sources, previous):
+        """Run main() with prior health and a discover() that sets source results."""
+        (self.root/'health.json').write_text(json.dumps({'sources': previous}))
+        def discover(cfg):
+            watcher.SOURCE_HEALTH.update(copy.deepcopy(sources))
+            return []
+        env = {'DISCORD_WEBHOOK_URL': 'test', 'GITHUB_TOKEN': 't', 'GITHUB_REPOSITORY': 'o/r'}
+        with patch.dict(os.environ, env, clear=True), patch.object(watcher, 'discover', side_effect=discover), \
+             patch.object(watcher, 'github_api', return_value={'number': 7}) as api:
+            code = watcher.main([])
+        return code, load_json(self.root/'health.json', {})['sources'], api
+
+    def test_stale_source_opens_one_issue_without_failing_run(self):
+        url = 'https://boards-api.greenhouse.io/v1/boards/gone/jobs'
+        down = {'ok': False, 'error': 'HTTP 404', 'failing_since': 1}
+        # One dead board among many healthy ones, below the broad-outage share.
+        healthy = {f'https://example.invalid/{i}': {'ok': True, 'last_success': 1} for i in range(20)}
+        code, sources, api = self.run_with_sources({url: down, **healthy}, {url: down})
+        self.assertEqual(code, 0)
+        self.assertEqual(sources[url]['issue'], 7)
+        self.assertEqual(api.call_args.args[:2], ('POST', 'issues'))
+        code, _, api = self.run_with_sources({url: dict(sources[url]), **healthy}, sources)
+        self.assertEqual(code, 0)
+        api.assert_not_called()
+
+    def test_recovered_source_closes_issue(self):
+        url = 'https://boards-api.greenhouse.io/v1/boards/back/jobs'
+        previous = {url: {'ok': False, 'error': 'HTTP 404', 'failing_since': 1, 'issue': 7}}
+        _, sources, api = self.run_with_sources({url: {'ok': True, 'last_success': 1}}, previous)
+        self.assertNotIn('issue', sources[url])
+        self.assertIn(('PATCH', 'issues/7', {'state': 'closed', 'state_reason': 'completed'}),
+                      [c.args for c in api.call_args_list])
+
+    def test_removed_source_closes_issue(self):
+        url = 'https://boards-api.greenhouse.io/v1/boards/removed/jobs'
+        previous = {url: {'ok': False, 'error': 'HTTP 404', 'failing_since': 1, 'issue': 7}}
+        _, sources, api = self.run_with_sources({}, previous)
+        self.assertEqual(sources, {})
+        self.assertIn(('PATCH', 'issues/7', {'state': 'closed', 'state_reason': 'completed'}),
+                      [c.args for c in api.call_args_list])
+
+    def test_broad_outage_still_fails_run(self):
+        down = {f'https://example.invalid/{i}': {'ok': False, 'error': 'Timeout', 'failing_since': 1}
+                for i in range(watcher.MAX_STALE_SOURCES + 1)}
+        code, _, _ = self.run_with_sources(down, down)
+        self.assertEqual(code, 1)
+
     def test_invalid_config_rejected(self):
         with self.assertRaises(ValueError):
             watcher.validate_config({'companies': [], 'max_discord_per_run': -1})
