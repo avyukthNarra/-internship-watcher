@@ -1,8 +1,28 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   DATA_URL,
   NEW_WINDOW_MS,
+  PAGE_SIZE,
+  ROLE_LABELS,
+  AVATAR_COLORS,
+  DEFAULT_CRITERIA,
+  inferRoles,
+  jobRoles,
+  prepareJobs,
+  isRemote,
+  isNew,
+  roleCounts,
+  formatRelative,
+  initials,
+  avatarColor,
+  criteriaFromQuery,
+  criteriaToQuery,
+  activeFilterCount,
+  isSearchShortcut,
+  compareTerms,
   filterJobs,
   sortJobs,
   sanitizeUrl,
@@ -72,7 +92,7 @@ test("company, term, and location filters combine", () => {
   );
   assert.deepEqual(filterJobs(jobs, { term: "Fall 2026" }, NOW).map((item) => item.id), ["1", "2"]);
   assert.deepEqual(listCompanies(jobs), ["Northwind Robotics", "Other"]);
-  assert.deepEqual(listTerms(jobs), ["Fall 2026", "Summer 2026"]);
+  assert.deepEqual(listTerms(jobs), ["Summer 2026", "Fall 2026"]); // chronological
 });
 
 test("new and top filters use first_seen and boolean top", () => {
@@ -168,4 +188,231 @@ test("normalizeJobs accepts an array and rejects other payloads", () => {
   assert.deepEqual(normalizeJobs(jobs).map((item) => item.id), ["1", "2"]);
   assert.equal(normalizeJobs({ jobs: [] }), null);
   assert.equal(normalizeJobs("[]"), null);
+});
+
+test("inferRoles mirrors the alert channel keywords with whole-word matching", () => {
+  assert.deepEqual(inferRoles("Software Engineer Intern"), ["SWE"]);
+  assert.deepEqual(inferRoles("Machine Learning Research Intern"), ["ML/AI", "Research"]);
+  assert.deepEqual(inferRoles("Embedded Software Intern"), ["Embedded"]);
+  assert.deepEqual(inferRoles("PCB Design Intern"), ["Hardware"]);
+  assert.deepEqual(inferRoles("FPGA Hardware Intern"), ["Embedded"]);
+  assert.deepEqual(inferRoles("Quantitative Trader Intern"), ["Quant"]);
+  assert.deepEqual(inferRoles("Data Analyst Intern"), ["Data"]);
+  assert.deepEqual(inferRoles("AI Platform Intern"), ["SWE", "ML/AI"]);
+  assert.deepEqual(inferRoles("International Sales Intern"), []);
+  assert.deepEqual(inferRoles("Retail Associate"), []);
+  assert.deepEqual(inferRoles(""), []);
+  assert.deepEqual(inferRoles(undefined), []);
+});
+
+test("jobRoles prefers exported roles and falls back to the title", () => {
+  assert.deepEqual(jobRoles(job({ title: "Software Intern", roles: ["Quant"] })), ["Quant"]);
+  assert.deepEqual(jobRoles(job({ title: "Software Intern", roles: [] })), []);
+  assert.deepEqual(jobRoles(job({ roles: ["Data", "Bogus", 7, "SWE"] })), ["SWE", "Data"]);
+  assert.deepEqual(jobRoles(job({ title: "Data Science Intern" })), ["Data"]);
+  assert.deepEqual(jobRoles(job({ title: "Data Science Intern", roles: "Data" })), ["Data"]);
+  assert.deepEqual(jobRoles(null), []);
+});
+
+test("prepareJobs resolves roles without mutating the payload", () => {
+  const input = [job({ id: "a", title: "Firmware Intern" }), job({ id: "b", roles: ["Research"] })];
+  const snapshot = JSON.parse(JSON.stringify(input));
+  const prepared = prepareJobs(input);
+  assert.deepEqual(input, snapshot);
+  assert.deepEqual(prepared.map((item) => item.roles), [["Embedded"], ["Research"]]);
+  assert.deepEqual(prepareJobs(null), []);
+});
+
+test("role filter matches any selected role; remote filter reads location", () => {
+  const jobs = [
+    job({ id: "swe", title: "Backend Intern", location: "Remote in USA" }),
+    job({ id: "ml", title: "ML Intern", roles: ["ML/AI"], location: "Austin, TX" }),
+    job({ id: "both", title: "x", roles: ["SWE", "ML/AI"], location: "Remote" }),
+    job({ id: "none", title: "Design Intern", location: "Remotely, OR" }),
+  ];
+  const ids = (criteria) => filterJobs(jobs, criteria, NOW).map((item) => item.id);
+  assert.deepEqual(ids({ roles: ["SWE"] }), ["swe", "both"]);
+  assert.deepEqual(ids({ roles: ["SWE", "ML/AI"] }), ["swe", "ml", "both"]);
+  assert.deepEqual(ids({ roles: ["Nope"] }), ["swe", "ml", "both", "none"]);
+  assert.deepEqual(ids({ remoteOnly: true }), ["swe", "both"]);
+  assert.deepEqual(ids({ remoteOnly: true, roles: ["ML/AI"] }), ["both"]);
+  assert.equal(isRemote("Hybrid / REMOTE"), true);
+  assert.equal(isRemote(undefined), false);
+});
+
+test("roleCounts ignore the role filter but honor the others", () => {
+  const jobs = [
+    job({ id: "1", roles: ["SWE"], top: true }),
+    job({ id: "2", roles: ["SWE", "Data"], top: false }),
+    job({ id: "3", roles: ["Quant"], top: true }),
+  ];
+  const counts = roleCounts(jobs, { roles: ["Quant"], topOnly: true }, NOW);
+  assert.equal(counts.SWE, 1);
+  assert.equal(counts.Data, 0);
+  assert.equal(counts.Quant, 1);
+  assert.deepEqual(Object.keys(counts), ROLE_LABELS);
+});
+
+test("isNew uses the 24 hour window", () => {
+  assert.equal(isNew(job({ first_seen: "2026-11-24T00:00:00.000Z" }), NOW), true);
+  assert.equal(isNew(job({ first_seen: "2026-11-23T23:59:59.000Z" }), NOW), false);
+  assert.equal(isNew(job({ first_seen: "2026-11-25T01:00:00.000Z" }), NOW), false);
+  assert.equal(isNew(null, NOW), false);
+});
+
+test("formatRelative uses compact buckets", () => {
+  assert.equal(formatRelative("2026-11-25T00:00:00.000Z", NOW), "now");
+  assert.equal(formatRelative("2026-11-24T23:59:30.000Z", NOW), "now");
+  assert.equal(formatRelative("2026-11-24T23:55:00.000Z", NOW), "5m ago");
+  assert.equal(formatRelative("2026-11-24T22:00:00.000Z", NOW), "2h ago");
+  assert.equal(formatRelative("2026-11-22T00:00:00.000Z", NOW), "3d ago");
+  assert.equal(formatRelative("2026-09-25T00:00:00.000Z", NOW), "2mo ago");
+  assert.equal(formatRelative("2025-11-01T00:00:00.000Z", NOW), "1y ago");
+  assert.equal(formatRelative("2026-11-25T02:00:00.000Z", NOW), "");
+  assert.equal(formatRelative("nope", NOW), "");
+});
+
+test("initials and avatar colors are deterministic", () => {
+  assert.equal(initials("Northwind Robotics"), "NR");
+  assert.equal(initials("acme"), "A");
+  assert.equal(initials("3M Labs Inc"), "3L");
+  assert.equal(initials("  Thistle & Finch "), "TF");
+  assert.equal(initials("Émile Ōkubo"), "ÉŌ");
+  assert.equal(initials("!!!"), "?");
+  assert.equal(initials(null), "?");
+  const color = avatarColor("Northwind Robotics");
+  assert.equal(avatarColor("Northwind Robotics"), color);
+  assert.equal(avatarColor(" northwind robotics "), color);
+  for (const name of ["", "a", "Aldermoor Labs", "Brightloom", "x".repeat(500)]) {
+    const value = avatarColor(name);
+    assert.ok(Number.isInteger(value) && value >= 0 && value < AVATAR_COLORS);
+  }
+  const spread = new Set(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"].map(avatarColor));
+  assert.ok(spread.size >= 5);
+});
+
+test("criteria round-trip through the URL query", () => {
+  const criteria = {
+    query: "robot arm",
+    company: "Thistle & Finch",
+    term: "Summer 2027",
+    location: "austin",
+    roles: ["ML/AI", "SWE"],
+    remoteOnly: true,
+    newOnly: true,
+    topOnly: false,
+    sort: "oldest",
+  };
+  const query = criteriaToQuery(criteria);
+  assert.ok(query.startsWith("?"));
+  assert.ok(!query.includes("top="));
+  assert.deepEqual(criteriaFromQuery(query), { ...criteria, roles: ["SWE", "ML/AI"] });
+  assert.equal(criteriaToQuery(DEFAULT_CRITERIA), "");
+  assert.equal(criteriaToQuery({ query: "   " }), "");
+  assert.deepEqual(criteriaFromQuery(""), { ...DEFAULT_CRITERIA });
+});
+
+test("criteriaFromQuery ignores junk and normalizes roles", () => {
+  const parsed = criteriaFromQuery("?role=swe,bogus,quant&sort=random&new=yes&top=1&q=" + "x".repeat(500));
+  assert.deepEqual(parsed.roles, ["SWE", "Quant"]);
+  assert.equal(parsed.sort, "newest");
+  assert.equal(parsed.newOnly, false);
+  assert.equal(parsed.topOnly, true);
+  assert.equal(parsed.query.length, 200);
+  assert.deepEqual(criteriaFromQuery(undefined), { ...DEFAULT_CRITERIA });
+});
+
+test("activeFilterCount counts narrowing filters only", () => {
+  assert.equal(activeFilterCount({}), 0);
+  assert.equal(activeFilterCount({ query: "x", sort: "oldest" }), 0);
+  assert.equal(
+    activeFilterCount({ roles: ["SWE", "Data"], term: "Fall 2026", location: " ", remoteOnly: true, topOnly: true }),
+    5
+  );
+});
+
+test("slash shortcut skips form fields, editable content, and modifiers", () => {
+  const key = (target, extra) => ({ key: "/", target, ...extra });
+  assert.equal(isSearchShortcut(key({ tagName: "BODY" })), true);
+  assert.equal(isSearchShortcut(key({ tagName: "button" })), true);
+  assert.equal(isSearchShortcut(key({ tagName: "INPUT" })), false);
+  assert.equal(isSearchShortcut(key({ tagName: "TEXTAREA" })), false);
+  assert.equal(isSearchShortcut(key({ tagName: "SELECT" })), false);
+  assert.equal(isSearchShortcut(key({ tagName: "DIV", isContentEditable: true })), false);
+  assert.equal(isSearchShortcut(key({ tagName: "BODY" }, { metaKey: true })), false);
+  assert.equal(isSearchShortcut({ key: "a", target: { tagName: "BODY" } }), false);
+  assert.equal(isSearchShortcut(null), false);
+});
+
+test("terms sort chronologically, then alphabetically", () => {
+  assert.deepEqual(
+    ["Summer 2027", "Co-op", "Fall 2026", "Spring 2027", "Winter 2027", "Fall 2027"].sort(compareTerms),
+    ["Fall 2026", "Winter 2027", "Spring 2027", "Summer 2027", "Fall 2027", "Co-op"]
+  );
+  assert.deepEqual(listTerms([job({ terms: ["Summer 2027", "Spring 2027"] })]), ["Spring 2027", "Summer 2027"]);
+});
+
+test("result labels group thousands", () => {
+  assert.equal(resultLabel(3412), "3,412 internships");
+  assert.equal(PAGE_SIZE, 50);
+});
+
+test("sample data is fictional and covers every role", () => {
+  const sample = JSON.parse(fs.readFileSync(path.join(__dirname, "sample-jobs.json"), "utf8"));
+  assert.ok(sample.length >= 30);
+  const keys = ["company", "first_seen", "id", "location", "roles", "source", "terms", "title", "top", "url"];
+  const seenRoles = new Set();
+  for (const item of sample) {
+    assert.deepEqual(Object.keys(item).sort(), keys);
+    assert.ok(item.url === "" || item.url.startsWith("https://example.com/"), item.url);
+    for (const role of item.roles) {
+      assert.ok(ROLE_LABELS.includes(role), role);
+      seenRoles.add(role);
+    }
+  }
+  assert.deepEqual([...seenRoles].sort(), [...ROLE_LABELS].sort());
+  assert.deepEqual(sortJobs(sample).map((item) => item.id), sample.map((item) => item.id));
+});
+
+test("Netlify and Vercel configs send the same security headers", () => {
+  const vercel = JSON.parse(fs.readFileSync(path.join(__dirname, "vercel.json"), "utf8"));
+  const netlify = fs.readFileSync(path.join(__dirname, "_headers"), "utf8");
+
+  // Parse Netlify's `_headers`: a path line followed by indented `Key: value` lines.
+  const netlifyRules = {};
+  let current = null;
+  for (const line of netlify.split("\n")) {
+    if (!line.trim() || line.trim().startsWith("#")) continue;
+    if (!/^\s/.test(line)) {
+      current = line.trim();
+      netlifyRules[current] = {};
+    } else {
+      const at = line.indexOf(":");
+      netlifyRules[current][line.slice(0, at).trim().toLowerCase()] = line.slice(at + 1).trim();
+    }
+  }
+  const vercelRules = Object.fromEntries(
+    vercel.headers.map((rule) => [
+      rule.source,
+      Object.fromEntries(rule.headers.map((h) => [h.key.toLowerCase(), h.value])),
+    ])
+  );
+
+  const site = netlifyRules["/*"];
+  assert.deepEqual(vercelRules["/(.*)"], site);
+  assert.match(site["content-security-policy"], /^default-src 'self';/);
+  assert.match(site["content-security-policy"], /frame-ancestors 'none'/);
+  assert.equal(site["x-content-type-options"], "nosniff");
+  assert.equal(site["referrer-policy"], "strict-origin-when-cross-origin");
+
+  for (const file of ["/jobs.json", "/sample-jobs.json"]) {
+    const cache = netlifyRules[file]["cache-control"];
+    assert.match(cache, /max-age=60\b/);
+    const vercelRule = vercel.headers.find((rule) => new RegExp(`^${rule.source}$`).test(file) && rule.source !== "/(.*)");
+    assert.ok(vercelRule, file);
+    assert.equal(vercelRule.headers.find((h) => h.key === "Cache-Control").value, cache);
+  }
+
+  const meta = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
+  assert.match(meta, /http-equiv="Content-Security-Policy" content="default-src 'self'/);
 });

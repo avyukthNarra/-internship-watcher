@@ -1,8 +1,11 @@
 import json
 import unittest
+from pathlib import Path
 
-from site_export import (EXPORT_FIELDS, MAX_SITE_EXPORT_JOBS,
+from site_export import (EXPORT_FIELDS, MAX_SITE_EXPORT_JOBS, ROLE_LABELS,
                          build_jobs_export)
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 class SiteExportTests(unittest.TestCase):
@@ -36,6 +39,11 @@ class SiteExportTests(unittest.TestCase):
             "companies": [], "simplify": {"company_keywords": []},
             "profiles": {markers["profile_id"]: {"webhook_url": markers["webhook"]}},
             "notion_parent_page_id": markers["notion"], "last_error": markers["error"],
+            "alert_channels": [
+                {"name": "swe", "webhook_env": "DISCORD_WEBHOOK_PRIVATE_SWE", "roles": ["software"]},
+                {"name": markers["profile_id"], "webhook_env": "DISCORD_WEBHOOK_PRIVATE_X",
+                 "roles": ["engineer"]},
+            ],
         }
         result = build_jobs_export([posting], state["jobs"], cfg,
                                    now="2026-11-24T12:00:00Z")
@@ -45,9 +53,11 @@ class SiteExportTests(unittest.TestCase):
         self.assertEqual(set(result[0]), EXPORT_FIELDS)
         for marker in markers.values():
             self.assertNotIn(marker, serialized)
+        self.assertNotIn("DISCORD_WEBHOOK", serialized)
         self.assertEqual(result[0]["url"], "https://example.com/jobs/one")
+        self.assertEqual(result[0]["roles"], ["SWE"])
         self.assertEqual(result, build_jobs_export(
-            [posting], state["jobs"], {"companies": [], "simplify": {}},
+            [posting], state["jobs"], {**cfg, "profiles": {}, "notion_parent_page_id": ""},
             now="2026-11-24T12:00:00Z"))
 
     def test_first_seen_is_preserved_and_retention_is_newest_first(self):
@@ -106,6 +116,47 @@ class SiteExportTests(unittest.TestCase):
         self.assertEqual(result[0]["source"], "workday")
         self.assertEqual(result[0]["url"],
                          "https://jobs.example.com/role?jobId=abc#job-details")
+
+
+    def test_roles_follow_alert_channel_matching(self):
+        cfg = json.loads((ROOT / "config.json").read_text())
+        cases = [
+            ("Software Engineer Intern", "", ["SWE"]),
+            ("Machine Learning Research Intern", "", ["ML/AI", "Research"]),
+            ("Embedded Software Intern", "", ["Embedded"]),  # swe excludes embedded
+            ("Firmware Engineer Intern", "Hardware", ["Embedded"]),
+            ("Mechanical Systems Intern", "Hardware", ["Hardware"]),
+            ("PCB Design Intern", "", ["Hardware"]),
+            ("Quantitative Trader Intern", "", ["Quant"]),
+            ("Summer Analyst", "Quant", ["Data", "Quant"]),
+            ("Product Design Intern", "", []),
+            ("International Sales Intern", "", []),  # "ai" is whole-word only
+            ("Data Science Intern - Mobile", "", ["SWE", "Data"]),
+        ]
+        postings = [{"id": f"simplify:{i}", "company": "Fictional", "title": title,
+                     "category": category, "location": "Remote",
+                     "url": f"https://example.com/jobs/{i}"}
+                    for i, (title, category, _) in enumerate(cases)]
+        result = build_jobs_export(postings, [], cfg, now="2026-11-24T12:00:00Z")
+        by_title = {item["title"]: item["roles"] for item in result}
+        for title, _, expected in cases:
+            self.assertEqual(by_title[title], expected, title)
+        for item in result:
+            self.assertTrue(set(item["roles"]) <= set(ROLE_LABELS))
+
+    def test_roles_are_empty_without_channels(self):
+        result = build_jobs_export(
+            [{"id": "lever:x:1", "title": "Software Engineer Intern",
+              "url": "https://example.com/jobs/1"}], [], {}, now="2026-11-24T12:00:00Z")
+        self.assertEqual(result[0]["roles"], [])
+
+    def test_web_sample_matches_export_schema(self):
+        sample = json.loads((ROOT / "web" / "sample-jobs.json").read_text())
+        self.assertGreaterEqual(len(sample), 30)
+        for item in sample:
+            self.assertEqual(set(item), EXPORT_FIELDS)
+            self.assertTrue(set(item["roles"]) <= set(ROLE_LABELS))
+            self.assertTrue(item["url"] == "" or item["url"].startswith("https://example.com/"))
 
 
 if __name__ == "__main__":
