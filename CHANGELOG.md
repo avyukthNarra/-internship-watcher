@@ -15,6 +15,7 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 ### Added
 - Direct boards for Rivian, Applied Intuition, Sentry, Zscaler, Chicago Trading Co. (three boards), and XTX Markets.
 - Public-safe `jobs.json` export for globally matching internships, with 45-day retention, bounded size, and a fictional front-end sample.
+- Static read-only internship browser in `web/` (search, company/term/location/new/top filters, newest-first sort) with fictional `sample-jobs.json`. Hosting and live data publishing wait on the owner.
 - `alert_channels`: shared Discord channels matched on `roles`, `exclude_roles`, `companies`, `locations`, `terms`, `categories`. Shipped role channels: `swe`, `data`, `research`, `ml`, `embedded`, `hardware`, `quant` (silent until their webhooks exist). Channels must set at least one include filter.
 - `vanshb03` aggregate feed (`vanshb03` config block; 3-day window).
 - `simplify.include_categories`, `category_exclude`, `category_roles`: pull whole SimplifyJobs categories (Hardware, Quant).

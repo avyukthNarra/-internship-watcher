@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+  <title>Internships</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#results">Skip to results</a>
+  <main class="wrap">
+    <header class="mast">
+      <h1>Internships</h1>
+      <p class="lede">Browse current openings. This copy uses fictional sample listings until a live jobs file is published.</p>
+    </header>
+
+    <form id="filters" class="filters">
+      <label class="field span-2" for="search">
+        Search
+        <input id="search" name="query" type="search" autocomplete="off" spellcheck="false">
+      </label>
+
+      <label class="field" for="company">
+        Company
+        <select id="company" name="company">
+          <option value="">All companies</option>
+        </select>
+      </label>
+
+      <label class="field" for="term">
+        Term
+        <select id="term" name="term">
+          <option value="">All terms</option>
+        </select>
+      </label>
+
+      <label class="field span-2" for="location">
+        Location
+        <input id="location" name="location" type="text" autocomplete="off">
+      </label>
+
+      <label class="check" for="new-only">
+        <input id="new-only" name="newOnly" type="checkbox">
+        New in last 24h
+      </label>
+
+      <label class="check" for="top-only">
+        <input id="top-only" name="topOnly" type="checkbox">
+        Top only
+      </label>
+
+      <label class="field" for="sort">
+        Sort
+        <select id="sort" name="sort">
+          <option value="newest" selected>Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </label>
+    </form>
+
+    <p id="status" class="status" role="status" aria-live="polite">Loading internships…</p>
+    <p id="retry-row" hidden>
+      <button type="button" id="retry">Try again</button>
+    </p>
+    <ul id="results" class="jobs"></ul>
+  </main>
+  <script src="jobs.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
