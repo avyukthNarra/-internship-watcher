@@ -10,3 +10,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Private state: stored in the private internship-watcher-state repo (see watch.yml)
+.state/
+message_map.json
+notion_state.json
