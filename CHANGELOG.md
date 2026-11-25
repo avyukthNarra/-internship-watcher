@@ -22,6 +22,7 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 - ETag conditional requests for the SimplifyJobs feed.
 - Dependabot for pip and GitHub Actions; `requests` pinned.
 - `sai_docs/`: context, security audit, optimizations, scraper guide, todo, owner checkout.
+- `state_snapshot.py`: validates and captures immutable, checksummed state generations and restores them safely.
 
 ### Changed
 - New company boards silently record their current postings on the first successful fetch; subsequent postings can alert. Existing boards retain their behavior and aggregate feeds are unchanged.
