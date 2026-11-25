@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 
 from job_feeds import BOARD_APIS
 
@@ -35,11 +36,19 @@ def validate_config(cfg):
         raise ValueError("config.json must contain a companies list")
     for company in cfg["companies"]:
         if not isinstance(company, dict) or not all(
-                isinstance(company.get(key), str) and company[key]
-                for key in ("name", "ats", "board")):
-            raise ValueError("Every company needs name, ats, and board strings")
+                isinstance(company.get(key), str) and company[key].strip()
+                for key in ("name", "ats")):
+            raise ValueError("Every company needs name and ats strings")
         if company["ats"] not in BOARD_APIS:
             raise ValueError("Unsupported ATS: " + company["ats"])
+        if company["ats"] == "workday":
+            for key in ("tenant", "site", "host"):
+                if not isinstance(company.get(key), str) or not re.fullmatch(r"[A-Za-z0-9_-]+", company[key]):
+                    raise ValueError("Workday needs valid tenant, site, and host strings")
+            if not re.fullmatch(r"wd[0-9]+", company["host"]):
+                raise ValueError("Workday host must look like wd5")
+        elif not isinstance(company.get("board"), str) or not company["board"].strip():
+            raise ValueError("Every company needs a board string")
     _non_negative_integers(cfg, ("max_discord_per_run", "dedup_days", "follow_up_days",
                                "max_delivery_attempts"))
     _string_lists(cfg, ("terms", "include_keywords", "exclude_keywords", "exclude_locations",

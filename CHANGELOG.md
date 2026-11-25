@@ -8,6 +8,8 @@ For semver here, a major bump means a breaking change to `config.json`, the stat
 
 ## [Unreleased]
 
+- Added a paginated Workday source and verifier support; configured the verified NVIDIA, Salesforce, Adobe, Blue Origin, and Boston Dynamics boards.
+
 ### Added
 - Direct boards for Rivian, Applied Intuition, Sentry, Zscaler, Chicago Trading Co. (three boards), and XTX Markets.
 - `alert_channels`: shared Discord channels matched on `roles`, `exclude_roles`, `companies`, `locations`, `terms`, `categories`. Shipped role channels: `swe`, `data`, `research`, `ml`, `embedded`, `hardware`, `quant` (silent until their webhooks exist). Channels must set at least one include filter.

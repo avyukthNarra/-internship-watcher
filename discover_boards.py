@@ -79,7 +79,7 @@ def discover(company, matcher):
     """All boards found for one {name, website} record."""
     found = []
     for slug in slug_variants(company["name"], company.get("website", "")):
-        for ats in BOARD_APIS:
+        for ats in ("greenhouse", "lever", "ashby"):
             result = probe(ats, slug, matcher)
             if result:
                 entry = {"company": company["name"], "ats": ats, "board": slug,
@@ -126,7 +126,7 @@ def main(argv=None):
     import watcher  # reuse the exact title filter
     include, exclude = cfg.get("include_keywords", ["intern"]), cfg.get("exclude_keywords", [])
     matcher = lambda title: watcher.matches(title, include, exclude)
-    tracked = {(c["ats"], c["board"].lower()) for c in cfg["companies"]}
+    tracked = {(c["ats"], c["board"].lower()) for c in cfg["companies"] if c["ats"] != "workday"}
     tracked_names = {c["name"].lower() for c in cfg["companies"]}
 
     if args.yc:

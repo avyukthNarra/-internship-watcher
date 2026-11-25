@@ -721,7 +721,7 @@ def _config_boards():
     except (OSError, json.JSONDecodeError):
         return {}
     return {c["name"].lower(): (c["ats"], c["board"])
-            for c in cfg.get("companies", [])}
+            for c in cfg.get("companies", []) if c.get("ats") != "workday"}
 
 
 def _posting_open(url, company=None, boards=None):

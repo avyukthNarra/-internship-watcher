@@ -6,7 +6,7 @@ This repository monitors internship postings and routes matching jobs to Discord
 
 Each watcher run:
 
-1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, and Ashby public APIs. It also reads the enabled SimplifyJobs, vanshb03, and Jobright feeds. The vanshb03 feed (`vanshb03` in `config.json`, with `max_age_days` and `year`) is a separate list of internships whose links are the maintainer's `go.vansh.nyc` shortlinks; cross-feed duplicates are caught by the company, title, location, and season fingerprint, not by URL.
+1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, Ashby, and Workday public APIs. It also reads the enabled SimplifyJobs, vanshb03, and Jobright feeds. The vanshb03 feed (`vanshb03` in `config.json`, with `max_age_days` and `year`) is a separate list of internships whose links are the maintainer's `go.vansh.nyc` shortlinks; cross-feed duplicates are caught by the company, title, location, and season fingerprint, not by URL.
 2. Applies the title, location, and season filters to every source. The top-level `terms` list applies to all sources; `simplify.terms` remains a backward-compatible fallback only when top-level `terms` is absent. `keep_unknown_terms` controls whether a posting with no recognizable season term is retained and defaults to keeping unknown terms.
 3. Identifies postings by ATS identity or canonical URL. Known campaign parameters are removed, while other URL query parameters are preserved because they may identify the job. Exact identities remain known indefinitely. Cross-source fuzzy fingerprints are retained for `dedup_days` (30 days by default). Legacy `norm:` entries in state are ignored for matching and are not removed.
 4. Places each new job into `delivery_state.json` with its individual destinations. Discord notifications are individual posts and retain the 📌 instruction. There are no digest messages. `max_discord_per_run` defaults to 50; undelivered destinations remain queued for a later run.
@@ -85,7 +85,7 @@ New or changed company boards are seeded silently on their first successful fetc
 
 To find boards you don't track yet, `discover_boards.py` tries likely Greenhouse, Lever, and Ashby slugs for a list of company names (`--names file.txt`) or for the open Y Combinator list of companies that are hiring (`--yc --min-team 10`). It prints boards with matching internship postings for you to review and never edits `config.json`; verify each pick with `verify_boards.py --candidate ATS BOARD` before adding it. A board listed under `[NAME DIFFERS - check]` may belong to a different company with a similar name.
 
-Wayve is fetched directly from its Ashby board. Postman moved to Workday, which the watcher does not fetch directly; it is included in the SimplifyJobs company filter and remains eligible for Jobright routing. Postman alerts depend on those feeds publishing matching jobs within the configured age window.
+Wayve is fetched directly from its Ashby board. Postman is not configured as a direct board; it is included in the SimplifyJobs company filter and remains eligible for Jobright routing. Postman alerts depend on those feeds publishing matching jobs within the configured age window.
 
 ### Alert channels
 
@@ -173,6 +173,7 @@ Check the boards in the actual configuration, a selected company, or a new candi
 python verify_boards.py
 python verify_boards.py --company Wayve
 python verify_boards.py --candidate ashby wayve
+python verify_boards.py --candidate workday nvidia/NVIDIAExternalCareerSite/wd5
 ```
 
 The verifier uses the same endpoints and feed-shape checks as the watcher, reports HTTP/schema errors, and exits nonzero if any board fails. It does not change runtime state or send notifications. Feed options and personal preferences are validated before a watcher scan begins.
@@ -188,3 +189,5 @@ See [IMPROVEMENTS.md](IMPROVEMENTS.md) for prioritized maintenance suggestions a
 - A duplicate Discord post can result from an accepted webhook request whose response timed out. The queue preserves work for retry; it does not claim exactly-once delivery.
 - Deleting state files causes history to be reconsidered. Preserve `seen.json`, `delivery_state.json`, `message_map.json`, and `notion_state.json` unless you intentionally want to reprocess work.
 - Old Notion rows and saved history remain valid. Rows whose URL was previously damaged by an older version are not automatically reconstructed.
+
+Workday company entries use `ats: "workday"` with `tenant`, `site`, and `host` (for example `wd5`). The verifier accepts `--candidate workday TENANT/SITE/HOST` and `--company NAME`. Workday searches for `intern`; relative posting dates are approximate and may be unavailable.
