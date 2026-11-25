@@ -183,7 +183,7 @@ create table notifications (               -- per-user alert ledger (dedupe + re
 );
 ```
 
-The watcher's internal state also moves into Supabase as JSON documents: the delivery ledger, health, the Discord message map and the Notion state. They go into `state_docs` / `state_parts`, exactly as in the earlier quick-move design.
+The watcher's internal state also moves into Supabase as JSON documents: the delivery ledger, health, and the Discord message map. They go into `state_docs` / `state_parts`, exactly as in the earlier quick-move design.
 - `job_utils.load_json` / `save_json` route the five state files there when `STATE_DATABASE_URL` is set.
 - Only the changed top-level keys are written.
 - A flood guard refuses to run if the history is missing.
@@ -208,7 +208,7 @@ Each run:
 3. **Post to the global channels** exactly as today (`watcher.deliver`, via the state documents).
 4. **Per-user alerts.** Load every user's preferences and effective top list in one query, run `job_utils.preference_matches(job, prefs)` (reused unchanged) on each new job plus an optional top-list check, then insert `notifications` rows.
 5. **Send** with a per-run budget and a per-user cap. DMs use the bot token: `POST /users/@me/channels`, then `POST /channels/{id}/messages`. Error 50007 means DMs are closed, so the alert is marked dead with no retry. Email uses the existing SMTP code.
-6. **Bridge Discord into the tracker.** For 📌 reactions and `#applied` links, look up `profiles.discord_user_id` and upsert `user_jobs` (`saved`, or `applied` with `applied_at`). This replaces the per-user part of Notion sync, and Notion becomes optional and legacy.
+6. **Bridge Discord into the tracker.** For 📌 reactions and `#applied` links, look up `profiles.discord_user_id` and upsert `user_jobs` (`saved`, or `applied` with `applied_at`). **Notion is dropped from this pipeline:** the database is the only applied list. Notion sync survives only in the legacy Discord repo (see below).
 
 **New code**
 - `state_db.py`: bot state documents.
@@ -217,7 +217,7 @@ Each run:
 
 **Edited**
 - `watcher.py`: jobs upsert, alerts and the bridge.
-- `notion_sync.py`: write to `user_jobs`.
+- `notion_sync.py`: removed. Its 📌 and `#applied` collection code (`_sync_pins`, `_collect_applied`) moves to a new `discord_bridge.py` that writes `user_jobs`. The `NOTION_*` secrets are no longer needed here.
 - `job_utils.py`: state routing.
 - `watch.yml`: secrets; drop the private-repo state steps.
 
@@ -240,7 +240,7 @@ Each run:
 3. **Jobs table:** the pipeline upserts jobs. Backfill from the current `known_ids` and pending entries where the details exist; the feed fills naturally within about 45 days.
 4. **Website MVP:** feed, login, tracker and settings, deployed to Vercel.
 5. **Per-user alerts:** DMs and email from preferences and the top list.
-6. **Discord bridge and import:** 📌 pins and `#applied` write to `user_jobs`. Import existing Notion history (`notion_state.json` users, plus "Applied On" dates from Notion pages) as `source = 'import'`.
+6. **Discord bridge:** 📌 pins and `#applied` write to `user_jobs`. Optionally, import Avy's existing applied history once from Notion as `source = 'import'`. There is no ongoing Notion sync.
 7. **Hardening:**
    - a nightly `pg_dump` to the private state repo (the free plan has no point-in-time restore);
    - retention (close and archive old jobs; prune `notifications`);
@@ -248,6 +248,43 @@ Each run:
    - a privacy page and account deletion (the cascade deletes are already in the schema).
 
 **Rough effort:** steps 1–3 take 2–3 days, step 4 about a week, and steps 5–6 2–3 days.
+
+## Scale: is Supabase free enough?
+
+There's no table per user. One `user_jobs` table holds everyone's rows, row-level security filters them, and `(user_id, job_id)` is the primary key. That's the standard multi-user design. A table or schema per user is an anti-pattern: migrations, RLS and backups multiply, and Postgres slows down with thousands of tables.
+
+Rough sizes:
+
+| Data | Estimate |
+|---|---|
+| `user_jobs` | about 250 bytes per row with indexes. 1,000 users × 200 tracked jobs = 200k rows ≈ 50 MB |
+| `jobs` | about 1 KB per posting, about 30–50k postings a year ≈ 50 MB a year (archive or prune closed ones) |
+| bot state documents | about 4 MB |
+
+**The free 500 MB database lasts several thousand active users.** The limits that bite first:
+
+- **Egress, 5 GB a month.** Serve the public feed as a cached file (Vercel ISR or a `jobs.json` regenerated each run), not a database query per visitor, and paginate the tracker.
+- **No point-in-time restore,** which the nightly `pg_dump` covers.
+- **Pausing:** not an issue, since the pipeline runs every 10 minutes.
+
+Move to Pro ($25/month: 8 GB, 250 GB egress, daily backups) when the site has real traffic.
+
+## Legacy Discord repo
+
+Avy's personal Discord bot (channel posts, 📌 pins, `#applied`, Notion) moves to its own repo, frozen at the current `main`. This repo then becomes the website pipeline.
+
+**GitHub Actions minutes decide where it lives.** The watcher runs about 155 times a day at about 1 minute each, roughly 5–9k minutes a month. Public repos get standard runners free. A private repo on the free plan gets only 2,000 minutes a month, so a private legacy repo would stop or cost about $40 a month.
+
+**Recommended: a *public* repo `internship-watcher-discord`.** Public is safe because its state stays in the private `internship-watcher-state` repo and its credentials are secrets.
+
+Steps:
+1. Create the repo from the current `main`, minus `web/`, `sai_docs/` and this plan.
+2. Create a `production` environment limited to `main`, with these secrets:
+   - `DISCORD_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL_TOP`, `DISCORD_BOT_TOKEN`, `APPLIED_CHANNEL_ID`, `NOTION_TOKEN` and `NOTION_PARENT_PAGE_ID`. GitHub never shows secret values, so these must be re-entered; reset the bot token and the Notion token, which needs rotating anyway.
+   - `STATE_DEPLOY_KEY`: a new deploy key on the state repo.
+3. Point the pinger at the new repo: set its `REPO` variable, and give `GH_PAT` access to the new repo.
+4. Disable `watch.yml` here, so two bots never write the same state. The website pipeline here then uses Supabase only.
+5. Add CODEOWNERS and a "Protect main" ruleset, the same as this repo.
 
 ## Costs and limits
 
