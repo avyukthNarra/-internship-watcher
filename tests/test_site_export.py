@@ -13,11 +13,14 @@ class SiteExportTests(unittest.TestCase):
             "notion": "NOTION-PAGE-PRIVATE-9912",
             "applied": "https://example.com/applied?member=PRIVATE-APPLIED-778",
             "error": "PRIVATE-ERROR-Traceback-secret-value",
+            "ref": "PRIVATE-REF-4431",
+            "email": "PRIVATE-EMAIL-5512",
         }
         posting = {
             "id": "simplify:public-job-1", "company": "Fictional Labs",
             "title": "Software Engineer Intern", "location": "Remote",
-            "url": "https://example.com/jobs/one?token=PRIVATE-APPLIED-778&utm_source=PRIVATE",
+            "url": ("https://example.com/jobs/one?token=PRIVATE-APPLIED-778&utm_source=PRIVATE"
+                    "&ref=PRIVATE-REF-4431&email=PRIVATE-EMAIL-5512"),
             "terms": ["Summer 2027"], "discord_user_id": markers["profile_id"],
             "message_id": markers["profile_id"], "channel_id": markers["profile_id"],
             "webhook_name": markers["webhook"], "pin": markers["profile_id"],
@@ -79,6 +82,30 @@ class SiteExportTests(unittest.TestCase):
         ]
         result = build_jobs_export(postings, [], now="2026-11-24T12:00:00Z")
         self.assertEqual([job["url"] for job in result], ["", ""])
+
+    def test_job_id_query_survives_and_keeps_distinct_jobs_distinct(self):
+        postings = [
+            {"id": "greenhouse:custom:123", "company": "Fictional", "title": "Intern",
+             "url": "https://careers.example.com/jobs?gh_jid=123"},
+            {"id": "greenhouse:custom:456", "company": "Fictional", "title": "Intern",
+             "url": "https://careers.example.com/jobs?gh_jid=456"},
+        ]
+        result = build_jobs_export(postings, [], now="2026-11-24T12:00:00Z")
+        self.assertEqual(len(result), 2)
+        self.assertEqual({item["url"] for item in result}, {
+            "https://careers.example.com/jobs?gh_jid=123",
+            "https://careers.example.com/jobs?gh_jid=456",
+        })
+        self.assertEqual(len({item["id"] for item in result}), 2)
+
+    def test_personal_and_referral_query_keys_are_removed_but_fragment_is_kept(self):
+        posting = {"id": "workday:tenant:role", "title": "Intern",
+                   "url": ("https://jobs.example.com/role?jobId=abc&ref=friend"
+                           "&email=person%40example.com&source=campaign#job-details")}
+        result = build_jobs_export([posting], [], now="2026-11-24T12:00:00Z")
+        self.assertEqual(result[0]["source"], "workday")
+        self.assertEqual(result[0]["url"],
+                         "https://jobs.example.com/role?jobId=abc#job-details")
 
 
 if __name__ == "__main__":

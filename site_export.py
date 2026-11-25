@@ -3,7 +3,7 @@
 import hashlib
 import re
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from job_utils import canonical_url, clean_job, job_identity
 from project_config import DEFAULT_SITE_EXPORT_DAYS
@@ -13,7 +13,11 @@ EXPORT_FIELDS = frozenset({
     "id", "company", "title", "location", "url", "terms", "source",
     "first_seen", "top",
 })
-_SOURCES = frozenset({"greenhouse", "lever", "ashby", "simplify", "vanshb03", "jobright"})
+_SOURCES = frozenset({"greenhouse", "lever", "ashby", "workday", "simplify", "vanshb03", "jobright"})
+_PRIVATE_QUERY_KEYS = frozenset({
+    "ref", "referrer", "referral", "source", "src", "token", "email", "e",
+    "uid", "user", "userid", "trk", "trackingid", "mkt_tok",
+})
 
 
 def _utc_datetime(value):
@@ -38,7 +42,7 @@ def _iso_utc(value):
 
 
 def _public_url(value):
-    """Use clean_job's text/scheme rules, and remove all query/fragment data."""
+    """Use the canonical public URL, dropping likely personal/referral query keys."""
     url = clean_job({"url": value}).get("url", "")
     try:
         parts = urlsplit(canonical_url(url))
@@ -52,7 +56,9 @@ def _public_url(value):
             host += f":{parts.port}"
         if parts.username or parts.password:
             return ""
-        return urlunsplit((parts.scheme.lower(), host, parts.path or "/", "", ""))
+        query = urlencode(sorted((key, val) for key, val in parse_qsl(parts.query, keep_blank_values=True)
+                                 if key.lower() not in _PRIVATE_QUERY_KEYS))
+        return urlunsplit((parts.scheme.lower(), host, parts.path or "/", query, parts.fragment))
     except ValueError:
         return ""
 
