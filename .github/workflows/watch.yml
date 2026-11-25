@@ -35,7 +35,7 @@ jobs:
         id: private_state
         run: cp .state/seen.json .state/delivery_state.json .state/health.json .state/notion_state.json .state/message_map.json .
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
