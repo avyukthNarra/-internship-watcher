@@ -39,7 +39,12 @@ export type Database = {
     Views: {
       user_top_companies: { Row: { user_id: string; company: string }; Relationships: [] };
     };
-    Functions: { [_ in never]: never };
+    Functions: {
+      top_jobs: {
+        Args: { p_days: number; p_limit: number; p_offset: number; p_query: string | null; p_term: string | null; p_location: string | null; p_source: string | null };
+        Returns: { id: string; company: string; title: string; location: string; url: string; terms: string[]; source: string; category: string | null; first_seen: string; total_count: number }[];
+      };
+    };
     Enums: { application_status: ApplicationStatus };
     CompositeTypes: { [_ in never]: never };
   };
