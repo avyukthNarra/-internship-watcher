@@ -316,6 +316,9 @@ def _filter_digest(cfg, feed="simplify"):
     which invalidates the cached ETag."""
     keys = (feed, "include_keywords", "exclude_keywords", "exclude_locations",
             "terms", "keep_unknown_terms")
+    if feed == "boards":
+        # Direct boards have no feed section; non-top boards also filter by channel roles.
+        keys += ("alert_channels",)
     blob = json.dumps({k: cfg.get(k) for k in keys}, sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
@@ -600,11 +603,13 @@ def discover(cfg):
         # Non-top boards are broad employers: keep only titles in a configured role.
         wanted = found if company.get("top", True) or roles is None else [
             j for j in found if roles.search((j.get("title") or "").lower())]
-        jobs.extend({**j, "company": company["name"]} for j in wanted)
+        jobs.extend({**j, "company": company["name"], "feed": "boards"} for j in wanted)
         key = company["ats"] + ":" + company_board(company)
         url = board_url(company["ats"], company_board(company))
         if SOURCE_HEALTH.get(url, {}).get("ok"):
             boards[key] = found
+    if boards:
+        feeds.add("boards")
     for name, fetcher in (("simplify", fetch_simplify), ("vanshb03", fetch_vanshb03),
                            ("jobright", fetch_jobright)):
         if cfg.get(name, {}).get("enabled", name == "simplify"):
@@ -630,8 +635,10 @@ def discover(cfg):
 def seed_feed_changes(jobs, seen, ledger, cfg, last_scan, successful_feeds):
     """Seed newly matched historical jobs while retaining post-scan alerts."""
     filters = ledger.setdefault("feed_filters", {})
+    # A fresh install (no completed scan yet) has no history to protect, so it delivers normally.
     changed = {job.get("feed") for job in jobs if job.get("feed")
-               and filters.get(job["feed"]) != _filter_digest(cfg, job["feed"])}
+               and filters.get(job["feed"]) != _filter_digest(cfg, job["feed"])
+               } if isinstance(last_scan, (int, float)) else set()
     count = 0
     for job in jobs:
         posted = job.get("date_posted")

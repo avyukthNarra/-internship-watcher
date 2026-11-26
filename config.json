@@ -19,8 +19,6 @@
     "civil engineering",
     "legal",
     "paralegal",
-    "sales",
-    "marketing",
     "recruiting",
     "accounting",
     "finance intern",
@@ -109,27 +107,6 @@
       "site": "NVIDIAExternalCareerSite",
       "host": "wd5",
       "max_pages": 10
-    },
-    {
-      "name": "Salesforce",
-      "ats": "workday",
-      "tenant": "salesforce",
-      "site": "External_Career_Site",
-      "host": "wd12"
-    },
-    {
-      "name": "Adobe",
-      "ats": "workday",
-      "tenant": "adobe",
-      "site": "external_experienced",
-      "host": "wd5"
-    },
-    {
-      "name": "Blue Origin",
-      "ats": "workday",
-      "tenant": "blueorigin",
-      "site": "BlueOrigin",
-      "host": "wd5"
     },
     {
       "name": "Boston Dynamics",
@@ -1531,14 +1508,6 @@
       "top": false
     },
     {
-      "name": "The Walt Disney Company",
-      "ats": "workday",
-      "tenant": "disney",
-      "site": "disneycareerdc",
-      "host": "wd5",
-      "top": false
-    },
-    {
       "name": "CACI",
       "ats": "workday",
       "tenant": "caci",
@@ -1562,29 +1531,6 @@
       "top": false
     },
     {
-      "name": "Johnson & Johnson",
-      "ats": "workday",
-      "tenant": "jj",
-      "site": "JJ",
-      "host": "wd5",
-      "top": false
-    },
-    {
-      "name": "Micron Technology",
-      "ats": "workday",
-      "tenant": "micron",
-      "site": "External",
-      "host": "wd1"
-    },
-    {
-      "name": "Leidos",
-      "ats": "workday",
-      "tenant": "leidos",
-      "site": "External",
-      "host": "wd5",
-      "top": false
-    },
-    {
       "name": "General Dynamics Information Technology",
       "ats": "workday",
       "tenant": "gdit",
@@ -1593,11 +1539,41 @@
       "top": false
     },
     {
-      "name": "Xcel Energy",
+      "name": "Hewlett Packard Enterprise",
       "ats": "workday",
-      "tenant": "xcelenergy",
-      "site": "External",
+      "tenant": "hpe",
+      "site": "jobsathpe",
+      "host": "wd5"
+    },
+    {
+      "name": "KLA",
+      "ats": "workday",
+      "tenant": "kla",
+      "site": "UR",
+      "host": "wd1"
+    },
+    {
+      "name": "Rockwell Automation",
+      "ats": "workday",
+      "tenant": "rockwellautomation",
+      "site": "External_Rockwell_Automation",
       "host": "wd1",
+      "top": false
+    },
+    {
+      "name": "AeroVironment",
+      "ats": "workday",
+      "tenant": "avav",
+      "site": "avav",
+      "host": "wd1",
+      "top": false
+    },
+    {
+      "name": "Motorola Solutions",
+      "ats": "workday",
+      "tenant": "motorolasolutions",
+      "site": "Careers",
+      "host": "wd5",
       "top": false
     },
     {
@@ -1767,7 +1743,8 @@
       "Hardware",
       "Quant",
       "Software",
-      "AI/ML/Data"
+      "AI/ML/Data",
+      "Product"
     ],
     "category_exclude": {
       "Hardware": [
@@ -1788,7 +1765,8 @@
       "Fall 2026",
       "Winter 2027",
       "Spring 2027",
-      "Summer 2027"
+      "Summer 2027",
+      "Fall 2027"
     ],
     "max_age_days": 7,
     "company_keywords": [
@@ -1899,7 +1877,8 @@
     "Fall 2026",
     "Winter 2027",
     "Spring 2027",
-    "Summer 2027"
+    "Summer 2027",
+    "Fall 2027"
   ],
   "site_export_days": 45,
   "keep_unknown_terms": true,

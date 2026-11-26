@@ -31,8 +31,19 @@ class FeedReseedTests(unittest.TestCase):
         self.assertEqual(watcher.seed_feed_changes([job], seen, ledger, cfg, 100, {"vanshb03"}), 0)
         self.assertFalse(seen)
         ledger["feed_filters"].clear()
-        self.assertEqual(watcher.seed_feed_changes([job], seen, ledger, cfg, None, set()), 1)
+        # A fresh install (no completed scan) has no history to protect: deliver normally.
+        self.assertEqual(watcher.seed_feed_changes([job], seen, ledger, cfg, None, set()), 0)
         self.assertNotIn("vanshb03", ledger["feed_filters"])
+
+    def test_board_filter_change_seeds_open_board_postings(self):
+        cfg = {"exclude_keywords": ["sales"]}
+        job = {"id": "greenhouse:acme:1", "feed": "boards", "title": "Sales Engineer Intern"}
+        ledger = {"feed_filters": {"boards": watcher._filter_digest(cfg, "boards")}}
+        cfg["exclude_keywords"] = []
+        seen = set()
+        self.assertEqual(watcher.seed_feed_changes([job], seen, ledger, cfg, 100, {"boards"}), 1)
+        self.assertIn("greenhouse:acme:1", seen)
+        self.assertEqual(ledger["feed_filters"]["boards"], watcher._filter_digest(cfg, "boards"))
 
     def test_partial_jobright_failure_does_not_commit_digest(self):
         cfg = {"simplify": {"enabled": False}, "jobright": {"enabled": True, "repos": ["one", "two"]}}
