@@ -2,21 +2,19 @@
 
 ## What this is
 
-An internship alert and application-tracking system. The main watcher reads configured company boards plus SimplifyJobs, vanshb03, and Jobright feeds, filters every source, and routes individual postings to Discord, email, and Notion. It can run from GitHub Actions or locally. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee.
+This repository runs a website data pipeline. `pipeline.py` uses `watcher.discover()` to read configured company boards and feeds, then syncs jobs and source health to Supabase. The GitHub `*/10` schedule is best effort and must not be documented as a ten-minute guarantee. The Discord bot lives in the separate legacy repository `avyukthNarra/internship-watcher-discord`.
 
-The `internship-pinger` Cloudflare Worker is now in this repository. It triggers `watch.yml`, monitors completed main-branch runs, and sends hourly stale/failure warnings. Keep worker changes and watcher changes conceptually separate; its README and Node test are part of the repository.
+The `internship-pinger` Cloudflare Worker code remains in this repository for the legacy Discord bot. It is separate from the Supabase pipeline; do not assume its current `watch.yml` target is part of this repo's deployment.
 
 ## Architecture facts
 
-- `watcher.py` fetches the configured Greenhouse, Lever, and Ashby boards and the enabled aggregate feeds.
-- `job_feeds.py` defines the shared board endpoints and feed validation used by the watcher and verifier. `project_config.py` owns configuration validation, optional webhook imports, and shared defaults. `source_health.py` builds health reports without I/O; `watcher.py` persists them.
+- `pipeline.py` is the scheduled entrypoint. `watcher.discover()` fetches configured Greenhouse, Lever, Ashby, and Workday boards and the enabled aggregate feeds; `db.py` syncs jobs and defaults to Supabase.
+- `job_feeds.py` defines shared board endpoints and feed validation used by discovery and the verifier. `project_config.py` owns configuration validation and shared defaults. `source_health.py` builds health reports without I/O; `pipeline.py` stores a compact summary in Supabase.
 - Wayve uses Ashby (`wayve`). Postman moved to Workday and is covered through the aggregate feeds, including an explicit SimplifyJobs company keyword; do not restore its dead Greenhouse entry or claim direct Workday coverage.
 - Filtering applies to all sources. Top-level `terms` is the season filter for every source; `simplify.terms` is only a backward-compatible fallback when top-level `terms` is absent. Unknown season terms are retained by default and can be controlled with `keep_unknown_terms`; profile terms can be configured independently.
 - `job_utils.py` canonicalizes URLs while preserving meaningful query parameters. Exact job identities persist. Cross-source fuzzy fingerprints expire after `dedup_days` (default 30). Legacy `norm:` entries in state are ignored for matching, not removed.
-- `delivery_state.json` is the durable per-destination queue for Discord, email, and Notion. `max_discord_per_run` defaults to 50. Discord uses individual posts and keeps 📌 pins; there are no digest messages.
-- `health.json` records the last completed scan, source health, pending deliveries, and sync errors. A failed run leaves checkpointed work for retry.
-- A source down 5h+ does not fail the run: the watcher opens one `source-down` GitHub issue (number kept in `health.json`), closes it when the source recovers, and dispatches `source-doctor.yml`, where Claude investigates and opens a PR. Only a broad outage (more than `MAX_STALE_SOURCES` (5) stale sources, or `BROAD_OUTAGE_FRACTION` (10%) of sources), pending deliveries, or sync errors fail the run. Deliveries that keep failing are parked in `delivery_state.json["dead"]` and do not count as pending. The doctor is off unless the repository variable `SOURCE_DOCTOR_ENABLED` is `true`, and it also needs a `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` secret. Keep it off while `main` is unprotected: it reads untrusted pages with write access.
-- `notion_state.json` durably tracks `pending_pins` and `pending_applied`. Applied rows set `Applied On` and a follow-up date; `follow_up_days` defaults to 14, supports per-profile overrides, and `0` disables the date. Stats report status counts and due follow-ups.
+- `health.json` in `state_docs` records the last completed scan, source counts, and per-source ok/error status. The pipeline exits nonzero for a broad source outage or database error.
+- The legacy Discord bot retains its own delivery, message, and Notion state in its separate repository. Those files are not part of this pipeline.
 - Notion upserts query existing rows by canonical job identity, including legacy rows, so existing history does not need a reseed migration. Previously stripped URLs are not automatically repairable.
 - Applied-link parsing may fetch HTML metadata after trying ATS APIs. Do not claim that the project never fetches HTML.
 - Notion pin and applied-link collection is separate from delivery; preserve the queue/cursor checkpoints when changing these helpers. Notion retry errors are recorded only when a request finally fails; ambiguous creates are not blindly retried.
@@ -26,20 +24,16 @@ The `internship-pinger` Cloudflare Worker is now in this repository. It triggers
 
 ## Deployment facts
 
-- Live repo: `github.com/avyukthNarra/-internship-watcher` (public, including the leading `-`; account `avyukthNarra`). Check `git remote -v` before assuming. This checkout may contain work in progress; do not imply a live rollout unless it has been verified.
-- The original `github.com/avyTamuGit/internship-watcher` deployment was disabled during the account migration. Do not re-enable it while the new deployment is the active path.
-- `gh` CLI is not installed on this machine. The old macOS keychain credential belongs to `avyTamuGit`; pushing to the new repo uses SSH.
-- Existing Notion history and state were carried across during migration. Do not reseed or delete state casually.
-- Secrets normally include Discord webhooks, `DISCORD_BOT_TOKEN`, `APPLIED_CHANNEL_ID`, `NOTION_TOKEN`, and `NOTION_PARENT_PAGE_ID`; SMTP secrets are optional.
+- This repository is `github.com/avyukthNarra/-internship-watcher` (public, including the leading `-`). Its `.github/workflows/pipeline.yml` runs `pipeline.py` every 10 minutes on a best-effort schedule and writes to Supabase project `mkphndqkihjanumsyrli`.
+- The Discord bot runs from `github.com/avyukthNarra/internship-watcher-discord`, the legacy bot repository.
+- `DATABASE_URL` is a secret in this repository's GitHub `production` environment. Do not print or commit its value.
 
 ## Working rules
 
 - Verify every new ATS board slug with `verify_boards.py` before adding it. Wrong slugs can 404 silently.
 - The verifier checks `config.json` by default; `--company NAME` selects an existing company and `--candidate ATS BOARD` checks a new slug without editing configuration. It exits nonzero on an HTTP or schema failure.
-- Preserve `seen.json`, `delivery_state.json`, `message_map.json`, and `notion_state.json`. Deleting them can requeue or re-alert historical jobs.
-- All five state files are private: `watch.yml` loads them from and saves them to the private `internship-watcher-state` repo (deploy key `STATE_DEPLOY_KEY`), along with a validated `snapshot/` generation each run. The bot never pushes to this repo. Never commit state files here.
-- The workflow always uploads state artifacts with seven-day retention. Persistence runs even after watcher failures and retries rebase/push up to three times; a rebase conflict leaves the artifact available for recovery.
-- Keep retries and state checkpoints durable. A run can fail after an external service accepted a request.
+- The legacy Discord bot's state files belong to its separate repository. This pipeline does not load or write those files; never commit runtime state files here.
+- Pipeline job data and its compact health summary live in Supabase. Do not add private state files or artifacts to the pipeline workflow.
 - Do not add a new feed merely because it sounds useful; inspect whether it duplicates SimplifyJobs, vanshb03, or Jobright. vanshb03 was added after measuring that most of its recent postings were not in SimplifyJobs; its links are `go.vansh.nyc` shortlinks, so URL identity cannot dedupe it.
 - Record user-visible changes (new sources, config keys, behavior changes, fixes) in `CHANGELOG.md` under Unreleased; follow semver as described there. Do not tag or bump a version without the owner.
 - Run `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. Keep setup and secret documentation useful for both GitHub Actions and local dry runs.

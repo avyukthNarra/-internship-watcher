@@ -1,33 +1,34 @@
-# Internship Watcher
+# Internship Job Pipeline
 
-This repository monitors internship postings and routes matching jobs to Discord, email, and Notion. It is designed to run from GitHub Actions or locally. GitHub's schedule is best effort, so the `*/10` cron is a request to GitHub rather than a delivery guarantee; runs can be delayed for hours.
+This repository runs `pipeline.py` from GitHub Actions every 10 minutes on a best-effort schedule; GitHub may delay scheduled runs. The pipeline discovers matching jobs and writes them to Supabase project `mkphndqkihjanumsyrli`. Its `DATABASE_URL` is stored as a secret in the GitHub `production` environment.
 
-## Architecture
+The Discord bot lives in the separate legacy repository, [`avyukthNarra/internship-watcher-discord`](https://github.com/avyukthNarra/internship-watcher-discord). This repository's pipeline does not send Discord, email, or Notion notifications.
 
-Each watcher run:
+## Pipeline architecture
 
-1. Fetches the company boards listed in `config.json` using the Greenhouse, Lever, Ashby, and Workday public APIs. It also reads the enabled SimplifyJobs, vanshb03, and Jobright feeds. The vanshb03 feed (`vanshb03` in `config.json`, with `max_age_days` and `year`) is a separate list of internships whose links are the maintainer's `go.vansh.nyc` shortlinks; cross-feed duplicates are caught by the company, title, location, and season fingerprint, not by URL.
-2. Applies the title, location, and season filters to every source. The top-level `terms` list applies to all sources; `simplify.terms` remains a backward-compatible fallback only when top-level `terms` is absent. `keep_unknown_terms` controls whether a posting with no recognizable season term is retained and defaults to keeping unknown terms.
-3. Identifies postings by ATS identity or canonical URL. Known campaign parameters are removed, while other URL query parameters are preserved because they may identify the job. Exact identities remain known indefinitely. Cross-source fuzzy fingerprints are retained for `dedup_days` (30 days by default). Legacy `norm:` entries in state are ignored for matching and are not removed.
-4. Places each new job into `delivery_state.json` with its individual destinations. Discord notifications are individual posts and retain the 📌 instruction. There are no digest messages. `max_discord_per_run` defaults to 50; undelivered destinations remain queued for a later run.
-5. Delivers to the configured Discord webhooks, email, and Notion master log. Notion reaction and applied-link processing then update personal trackers.
+Each run:
 
-The watcher checkpoints intent before external delivery and uses atomic JSON writes. A request timeout can still mean that Discord accepted a message before the response was lost, so a retry can duplicate a Discord post. Querying existing Notion rows by job identity reduces duplicate tracker rows, but delivery is not exactly once.
-
-The repository also contains the `internship-pinger` Cloudflare Worker. It triggers the `watch.yml` workflow and monitors completed main-branch runs, sending hourly stale or failure warnings. See [`internship-pinger/README.md`](internship-pinger/README.md) for its setup.
+1. Loads `config.json` and calls `watcher.discover()` to fetch and filter configured ATS boards and aggregate feeds.
+2. Synchronizes `companies[].name` and `simplify.company_keywords` to `default_top_companies`.
+3. Upserts discovered postings into Supabase `jobs`, preserving `first_seen` and identifying newly inserted IDs.
+4. Closes jobs missing from direct boards that were fetched successfully and saves a compact source-health summary.
 
 The Python modules have separate responsibilities:
 
 | Module | Responsibility |
 | --- | --- |
-| `watcher.py` | Discover, filter, deduplicate, checkpoint, and deliver postings |
+| `pipeline.py` | Run discovery, database synchronization, and health reporting |
+| `db.py` | Upsert jobs, close missing jobs, and sync default top companies |
+| `state_db.py` | Store the compact pipeline health summary |
+| `watcher.py` | Reusable board/feed discovery and filters; legacy notification code remains for compatibility |
 | `job_feeds.py` | Shared board endpoints and feed validation |
-| `project_config.py` | Validate configuration, import personal webhook settings, and resolve defaults |
-| `source_health.py` | Calculate scan health, format summaries, and choose the run's exit status |
-| `notion_sync.py` | Master log, durable pin/applied queues, posting liveness, and tracker statistics |
+| `project_config.py` | Validate configuration and resolve defaults |
+| `source_health.py` | Calculate scan health and choose the run's exit status |
 | `job_utils.py` | Job identities, preferences, and atomic JSON storage |
 
-Notion sync queues observed pins and application links before processing them. Collection and delivery are separate steps so a failed write can retry even after the original message is gone. A recovered request does not count as a sync failure; ambiguous page/database creates still require a fresh lookup before retrying.
+The workflow is `.github/workflows/pipeline.yml`. To run it manually, use the Actions tab's workflow dispatch button. For a local run, install dependencies and set `DATABASE_URL` to a development database before running `python pipeline.py`.
+
+The sections below about Discord, Notion, delivery queues, and private JSON state describe the legacy bot's behavior. The active bot and its state live in the legacy repository.
 
 ## Notion and Discord workflow
 
@@ -178,7 +179,7 @@ python verify_boards.py --candidate workday nvidia/NVIDIAExternalCareerSite/wd5
 
 The verifier uses the same endpoints and feed-shape checks as the watcher, reports HTTP/schema errors, and exits nonzero if any board fails. It does not change runtime state or send notifications. Feed options and personal preferences are validated before a watcher scan begins.
 
-Run the tests with `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. The workflow always uploads the five state files as a recovery artifact with seven-day retention. Its persistence step always runs, makes up to three rebase/push attempts, and preserves the artifact if a rebase conflict prevents pushing. Do not assume the scheduled workflow runs exactly every ten minutes.
+Run the tests with `python3 -m unittest discover -s tests -v` and `node --test internship-pinger/worker.test.js`. The pipeline workflow does not upload private state artifacts; jobs and the compact health summary are stored in Supabase. Do not assume the scheduled workflow runs exactly every ten minutes.
 
 See [IMPROVEMENTS.md](IMPROVEMENTS.md) for prioritized maintenance suggestions and their tradeoffs.
 
