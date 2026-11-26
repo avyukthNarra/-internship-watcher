@@ -138,3 +138,14 @@ class WorkdayTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class WorkdayIdentityTests(unittest.TestCase):
+    def test_feed_and_board_links_share_identity(self):
+        from job_utils import job_identity
+        board = {"id": "workday:x", "url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-CA-Santa-Clara/Software-Intern_JR123"}
+        feed = {"id": "simplify:1", "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/Santa-Clara/Software-Intern_JR123?utm_source=Simplify"}
+        self.assertEqual(job_identity(board), job_identity(feed))
+        self.assertEqual(job_identity(board), "workday:nvidia:software-intern_jr123")
+        other = {"id": "y", "url": "https://amd.wd1.myworkdayjobs.com/External/job/Austin/Software-Intern_JR123"}
+        self.assertNotEqual(job_identity(board), job_identity(other))

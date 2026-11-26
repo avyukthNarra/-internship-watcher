@@ -77,6 +77,10 @@ def job_identity(job):
         if host == domain or host.endswith('.' + domain):
             if len(parts) >= 2:
                 return ats + ':' + parts[0].lower() + ':' + parts[1]
+    # Workday links differ by locale prefix, site and location segment; the job slug
+    # (title plus requisition ID) is stable, so feeds and the board share one identity.
+    if host.endswith('.myworkdayjobs.com') and 'job' in parts and parts[-1] != 'job':
+        return 'workday:' + host.split('.')[0] + ':' + parts[-1].lower()
     return 'url:' + url if url else 'id:' + job['id']
 
 
