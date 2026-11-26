@@ -4,7 +4,7 @@
 const DATA_URL = "./sample-jobs.json";
 const NEW_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 50;
-const ROLE_LABELS = ["SWE", "Data", "ML/AI", "Research", "Embedded", "Hardware", "Quant"];
+const ROLE_LABELS = ["SWE", "Data", "ML/AI", "Research", "Embedded", "Hardware", "Quant", "Product"];
 const AVATAR_COLORS = 10;
 const SORTS = ["newest", "oldest"];
 
@@ -19,25 +19,31 @@ const ROLE_RULES = [
   {
     label: "SWE",
     roles: ["software", "swe", "backend", "frontend", "full stack", "fullstack", "web",
-      "mobile", "devops", "platform", "infrastructure"],
+      "mobile", "devops", "platform", "infrastructure", "security", "cybersecurity"],
     exclude: EMBEDDED_WORDS,
   },
   { label: "Data", roles: ["data", "analytics", "analyst", "business intelligence"] },
   {
     label: "ML/AI",
     roles: ["machine learning", "ml", "ai", "deep learning", "computer vision", "nlp", "llm",
-      "artificial intelligence", "generative"],
+      "artificial intelligence", "generative", "perception", "autonomy", "autonomous"],
   },
   { label: "Research", roles: ["research", "scientist"] },
-  { label: "Embedded", roles: EMBEDDED_WORDS },
+  { label: "Embedded", roles: [...EMBEDDED_WORDS, "robotics", "controls", "mechatronics"] },
   {
     label: "Hardware",
     roles: ["hardware", "electrical", "electronics", "circuit", "pcb", "analog", "digital design",
       "verification", "validation", "silicon", "semiconductor", "optical", "photonics", "thermal",
-      "rf", "power electronics", "test engineer", "manufacturing"],
+      "rf", "power electronics", "test engineer", "manufacturing", "mechanical", "systems engineer",
+      "systems engineering", "integration and test", "reliability"],
     exclude: EMBEDDED_WORDS,
   },
   { label: "Quant", roles: ["quant", "quantitative", "trading", "trader", "market making"] },
+  {
+    label: "Product",
+    roles: ["product manager", "product management", "program manager", "technical program",
+      "product owner", "product analyst"],
+  },
 ];
 
 function escapeRegExp(text) {

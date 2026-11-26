@@ -13,7 +13,6 @@
     "hvac",
     "welding",
     "unpaid",
-    "mechanical",
     "civil engineer",
     "civil engineering",
     "legal",
@@ -27,7 +26,8 @@
     "phd",
     "ph.d",
     " mba",
-    "mba "
+    "mba ",
+    "human resources"
   ],
   "exclude_locations": [
     "canada",
@@ -1899,7 +1899,9 @@
         "mobile",
         "devops",
         "platform",
-        "infrastructure"
+        "infrastructure",
+        "security",
+        "cybersecurity"
       ],
       "exclude_roles": [
         "embedded",
@@ -1944,7 +1946,10 @@
         "nlp",
         "llm",
         "artificial intelligence",
-        "generative"
+        "generative",
+        "perception",
+        "autonomy",
+        "autonomous"
       ]
     },
     {
@@ -1960,7 +1965,10 @@
         "rtos",
         "device driver",
         "bare metal",
-        "linux kernel"
+        "linux kernel",
+        "robotics",
+        "controls",
+        "mechatronics"
       ]
     },
     {
@@ -2003,7 +2011,12 @@
         "rf",
         "power electronics",
         "test engineer",
-        "manufacturing"
+        "manufacturing",
+        "mechanical",
+        "systems engineer",
+        "systems engineering",
+        "integration and test",
+        "reliability"
       ],
       "exclude_roles": [
         "embedded",
@@ -2034,6 +2047,25 @@
         "trading",
         "trader",
         "market making"
+      ]
+    },
+    {
+      "name": "product",
+      "webhook_env": "DISCORD_WEBHOOK_PRODUCT",
+      "categories": [
+        "Product"
+      ]
+    },
+    {
+      "name": "product-by-title",
+      "webhook_env": "DISCORD_WEBHOOK_PRODUCT",
+      "roles": [
+        "product manager",
+        "product management",
+        "program manager",
+        "technical program",
+        "product owner",
+        "product analyst"
       ]
     }
   ],

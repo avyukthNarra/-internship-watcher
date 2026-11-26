@@ -17,11 +17,12 @@ EXPORT_FIELDS = frozenset({
 # is listed here contributes its label when the channel's role keywords or
 # SimplifyJobs categories match. Unlisted channel names add nothing, so a new
 # private channel name never reaches the public file.
-ROLE_LABELS = ("SWE", "Data", "ML/AI", "Research", "Embedded", "Hardware", "Quant")
+ROLE_LABELS = ("SWE", "Data", "ML/AI", "Research", "Embedded", "Hardware", "Quant", "Product")
 CHANNEL_ROLE_LABELS = {
     "swe": "SWE", "data": "Data", "ml": "ML/AI", "research": "Research",
     "embedded": "Embedded", "hardware": "Hardware", "hardware-by-title": "Hardware",
     "quant": "Quant", "quant-by-title": "Quant",
+    "product": "Product", "product-by-title": "Product",
 }
 _ROLE_MATCH_KEYS = ("roles", "exclude_roles", "categories")
 _SOURCES = frozenset({"greenhouse", "lever", "ashby", "workday", "simplify", "vanshb03", "jobright"})

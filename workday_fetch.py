@@ -5,6 +5,8 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +18,8 @@ from workday_results import MAX_RESULTS_BYTES, validate_results
 
 HEARTBEAT_SECONDS = 2 * 3600
 LAPTOP_MAX_PAGES = 5
+DEFAULT_WORKERS = 3
+MAX_WORKERS = 4
 BACKOFF_INITIAL = 30 * 60
 BACKOFF_MAX = 6 * 3600
 BACKOFF_PATH = watcher.ROOT / "laptop" / ".workday_backoff.json"
@@ -33,39 +37,54 @@ def load_backoff(path):
     return data
 
 
-def collect(config, *, backoff_path=BACKOFF_PATH, dry_run=False):
+def _fetch_board(company, blocked):
+    """Fetch one board unless another worker already hit a Workday block."""
+    board = company_board(company)
+    if blocked.is_set():
+        return board, {'ok': False, 'error': 'Skipped after Workday block', 'jobs': []}, {}
+    url = board_url('workday', board)
+    watcher.SOURCE_HEALTH.pop(url, None)
+    try:
+        jobs = watcher.fetch_workday(board, max_pages=company.get('max_pages', LAPTOP_MAX_PAGES), page_delay=1)
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+        return board, {'ok': False, 'error': type(exc).__name__, 'jobs': []}, {}
+    record = dict(watcher.SOURCE_HEALTH.get(url, {}))
+    ok = bool(record.get('ok'))
+    if record.get('skipped'):
+        blocked.set()
+    return board, {'ok': ok, 'error': None if ok else str(record.get('error', 'Request failed')), 'jobs': jobs if ok else []}, record
+
+
+def collect(config, *, backoff_path=BACKOFF_PATH, dry_run=False, workers=DEFAULT_WORKERS):
+    """Fetch every Workday board. Different companies run on up to `workers`
+    threads (each board still pages sequentially with a 1s gap); use 1 to keep
+    the laptop quiet, for example while gaming."""
     companies = [c for c in config['companies'] if c['ats'] == 'workday']
     state = load_backoff(backoff_path)
-    now = time.time()
-    if now < state['retry_at']:
+    if time.time() < state['retry_at']:
         print(f"Workday backoff active until {datetime.fromtimestamp(state['retry_at'], timezone.utc).isoformat()}")
         return None
-    boards = {}
-    blocked = False
-    for index, company in enumerate(companies):
-        board = company_board(company)
-        if blocked:
-            boards[board] = {'ok': False, 'error': 'Skipped after Workday block', 'jobs': []}
-            continue
-        if index:
-            time.sleep(1)
-        watcher.SOURCE_HEALTH.clear()
-        try:
-            jobs = watcher.fetch_workday(board, max_pages=company.get('max_pages', LAPTOP_MAX_PAGES), page_delay=1)
-            record = watcher.SOURCE_HEALTH.get(board_url('workday', board), {})
-            ok = bool(record.get('ok'))
-            boards[board] = {'ok': ok, 'error': None if ok else str(record.get('error', 'Request failed')), 'jobs': jobs if ok else []}
-            if record.get('skipped'):
-                blocked = True
-                blocks = state['blocks'] + 1
-                cooldown = min(BACKOFF_MAX, BACKOFF_INITIAL * 2 ** min(blocks - 1, 4))
-                retry_at = max(time.time() + cooldown, record.get('retry_at', 0))
-                if not dry_run:
-                    atomic_write(backoff_path, {'blocks': blocks, 'retry_at': retry_at})
-                print(f"Workday block: cooling down until {datetime.fromtimestamp(retry_at, timezone.utc).isoformat()}")
-        except (ValueError, TypeError, KeyError, AttributeError) as exc:
-            boards[board] = {'ok': False, 'error': type(exc).__name__, 'jobs': []}
-    if not blocked and all(result['ok'] for result in boards.values()) and state['blocks'] and not dry_run:
+    blocked = threading.Event()
+    results = {}
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, MAX_WORKERS))) as pool:
+        futures = []
+        for index, company in enumerate(companies):
+            futures.append(pool.submit(_fetch_board, company, blocked))
+            if index < len(companies) - 1:
+                time.sleep(1)  # stagger starts so requests never burst
+        for future in futures:
+            board, result, record = future.result()
+            results[board] = (result, record)
+    boards = {company_board(c): results[company_board(c)][0] for c in companies}
+    if blocked.is_set():
+        retry_after = max((record.get('retry_at', 0) for _, record in results.values()), default=0)
+        blocks = state['blocks'] + 1
+        cooldown = min(BACKOFF_MAX, BACKOFF_INITIAL * 2 ** min(blocks - 1, 4))
+        retry_at = max(time.time() + cooldown, retry_after)
+        if not dry_run:
+            atomic_write(backoff_path, {'blocks': blocks, 'retry_at': retry_at})
+        print(f"Workday block: cooling down until {datetime.fromtimestamp(retry_at, timezone.utc).isoformat()}")
+    elif all(result['ok'] for result in boards.values()) and state['blocks'] and not dry_run:
         atomic_write(backoff_path, {'blocks': 0, 'retry_at': 0})
     data = {'schema': 1, 'fetched_at': datetime.now(timezone.utc).isoformat(), 'boards': boards}
     validate_results(data, [company_board(c) for c in companies])
@@ -129,12 +148,14 @@ def main(argv=None):
     parser.add_argument('--out', type=Path, help='write a local results file')
     parser.add_argument('--push', type=Path, metavar='REPO_DIR', help='publish to a private results clone')
     parser.add_argument('--dry-run', action='store_true', help='fetch and print without writing or pushing')
+    parser.add_argument('--workers', type=int, default=DEFAULT_WORKERS, choices=range(1, MAX_WORKERS + 1),
+                        help='companies fetched in parallel (1 = quiet mode)')
     args = parser.parse_args(argv)
     if not args.out and not args.push and not args.dry_run:
         parser.error('specify --out, --push, or --dry-run')
     config = json.loads(watcher.CONFIG_PATH.read_text(encoding='utf-8'))
     validate_config(config)
-    data = collect(config, dry_run=args.dry_run)
+    data = collect(config, dry_run=args.dry_run, workers=args.workers)
     if data is None:
         return 0
     if args.dry_run:

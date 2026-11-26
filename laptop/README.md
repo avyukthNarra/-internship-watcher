@@ -45,3 +45,7 @@ Invoke-WebRequest -Method Post -Uri 'https://nvidia.wd5.myworkdayjobs.com/wday/c
 ## Resource use
 
 Each task runs one short Python process at below-normal priority, typically using tens of MB of RAM and a few hundred KB of network traffic (actual use varies with the boards and results). It should have little noticeable effect on gaming.
+
+## Gaming mode
+
+`run_workday.ps1` checks for VALORANT before each run. If it is running, the fetch uses one company at a time at idle priority (about 1–3 minutes); otherwise it fetches 3 companies in parallel at below-normal priority (well under a minute). Edit `$games` in the script to add other games.
