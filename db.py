@@ -1,8 +1,9 @@
-"""Database writes for jobs and the repository's default company list."""
+"""Database writes for discovered jobs and the repository default company list."""
 import os
 from datetime import datetime, timezone
 
 import psycopg
+from psycopg import sql
 
 from job_utils import job_identity
 
@@ -34,6 +35,7 @@ def sync_default_top_companies(cfg):
 
 
 def upsert_jobs(jobs, now):
+    """Upsert a scan in one round trip; return only IDs inserted this run."""
     now = _timestamp(now)
     rows = []
     for job in jobs:
@@ -49,44 +51,63 @@ def upsert_jobs(jobs, now):
             job.get("source") or job_id.split(":", 1)[0],
             job.get("category"),
             now,
+            now,
         ))
     if not rows:
-        return
+        return set()
+
+    value_sql = sql.SQL(", ").join(
+        sql.SQL("({})").format(sql.SQL(", ").join(sql.Placeholder() for _ in rows[0]))
+        for _ in rows
+    )
+    query = sql.SQL("""insert into public.jobs
+        (id, identity, company, title, location, url, terms, source, category, first_seen, last_seen)
+        values {values}
+        on conflict (id) do update set
+          identity = excluded.identity,
+          company = excluded.company,
+          title = excluded.title,
+          location = excluded.location,
+          url = excluded.url,
+          terms = excluded.terms,
+          source = excluded.source,
+          category = excluded.category,
+          last_seen = excluded.last_seen,
+          closed_at = null
+        where public.jobs.identity is distinct from excluded.identity
+           or public.jobs.company is distinct from excluded.company
+           or public.jobs.title is distinct from excluded.title
+           or public.jobs.location is distinct from excluded.location
+           or public.jobs.url is distinct from excluded.url
+           or public.jobs.terms is distinct from excluded.terms
+           or public.jobs.source is distinct from excluded.source
+           or public.jobs.category is distinct from excluded.category
+           or public.jobs.closed_at is not null
+           or public.jobs.last_seen <= excluded.last_seen - interval '1 hour'
+        returning id, (xmax = 0) as inserted""").format(values=value_sql)
+    params = [value for row in rows for value in row]
     with connect() as conn:
-        conn.cursor().executemany(
-            """insert into public.jobs
-               (id, identity, company, title, location, url, terms, source, category,
-                first_seen, last_seen)
-               values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-               on conflict (id) do update set
-                 identity = excluded.identity,
-                 company = excluded.company,
-                 title = excluded.title,
-                 location = excluded.location,
-                 url = excluded.url,
-                 terms = excluded.terms,
-                 source = excluded.source,
-                 category = excluded.category,
-                 last_seen = excluded.last_seen,
-                 closed_at = null""",
-            [(*row[:9], row[9], row[9]) for row in rows],
-        )
+        returned = conn.execute(query, params).fetchall()
+    return {job_id for job_id, inserted in returned if inserted}
 
 
 def close_missing_jobs(board_sources_ok, seen_ids, now):
-    """Close jobs missing from successful direct ATS board snapshots only.
-
-    `board_sources_ok` contains `ats:board` keys, matching the prefix of watcher
-    job IDs. Aggregate feeds are never passed here.
-    """
+    """Close missing jobs for successful direct boards in one SQL statement."""
+    sources = sorted(set(board_sources_ok))
+    if not sources:
+        return
     now = _timestamp(now)
-    seen_ids = list(seen_ids)
     with connect() as conn:
-        for source in sorted(set(board_sources_ok)):
-            prefix = f"{source}:"
-            conn.execute(
-                """update public.jobs set closed_at = %s
-                   where left(id, %s) = %s and closed_at is null
-                     and not (id = any(%s))""",
-                (now, len(prefix), prefix, seen_ids),
-            )
+        conn.execute(
+            """with active_sources as (
+                   select unnest(%s::text[]) as source
+               ), present_jobs as (
+                   select unnest(%s::text[]) as id
+               )
+               update public.jobs as job set closed_at = %s
+               from active_sources as active
+               where left(job.id, length(active.source) + 1) = active.source || ':'
+                 and job.closed_at is null
+                 and not exists (select 1 from present_jobs where present_jobs.id = job.id)""",
+            (sources, list(seen_ids), now),
+        )

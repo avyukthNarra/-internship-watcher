@@ -1,13 +1,13 @@
 import os
-import time
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 import psycopg
 
 import db
+import state_db
 
 
 TEST_URL = os.environ.get("TEST_DATABASE_URL")
@@ -38,35 +38,70 @@ class JobsDatabaseTests(unittest.TestCase):
             "terms": ["Summer 2027"], "category": "Software", **changes,
         }
 
-    def test_first_seen_is_stable_across_upserts(self):
-        now = datetime(2026, 11, 25, tzinfo=timezone.utc)
+    def test_returns_only_new_ids_and_keeps_first_seen_stable(self):
+        first = datetime(2026, 11, 25, tzinfo=timezone.utc)
         job = self.job()
-        db.upsert_jobs([job], now)
+        self.assertEqual(db.upsert_jobs([job], first), {job["id"]})
+        self.assertEqual(db.upsert_jobs([job], first + timedelta(minutes=10)), set())
+
         changed = self.job(title="Software Engineering Intern", location="Austin")
-        db.upsert_jobs([changed], datetime(2026, 11, 26, tzinfo=timezone.utc))
+        self.assertEqual(db.upsert_jobs([changed], first + timedelta(minutes=20)), set())
         with psycopg.connect(TEST_URL) as conn:
             row = conn.execute(
-                "select first_seen, last_seen, title, location, closed_at from public.jobs where id = %s",
+                "select first_seen, last_seen, title, location from public.jobs where id = %s",
                 (job["id"],),
             ).fetchone()
-        self.assertEqual(row[0], now)
-        self.assertEqual(row[1], datetime(2026, 11, 26, tzinfo=timezone.utc))
-        self.assertEqual(row[2:4], ("Software Engineering Intern", "Austin"))
-        self.assertIsNone(row[4])
+        self.assertEqual(row, (first, first + timedelta(minutes=20),
+                               "Software Engineering Intern", "Austin"))
 
-    def test_only_successful_direct_board_sources_are_closed(self):
+    def test_last_seen_only_advances_after_one_hour_when_fields_are_unchanged(self):
+        first = datetime(2026, 11, 25, tzinfo=timezone.utc)
+        job = self.job()
+        db.upsert_jobs([job], first)
+        db.upsert_jobs([job], first + timedelta(minutes=59))
+        with psycopg.connect(TEST_URL) as conn:
+            recent = conn.execute("select last_seen from public.jobs where id = %s",
+                                  (job["id"],)).fetchone()[0]
+        self.assertEqual(recent, first)
+
+        db.upsert_jobs([job], first + timedelta(hours=1, seconds=1))
+        with psycopg.connect(TEST_URL) as conn:
+            last_seen = conn.execute(
+                "select first_seen, last_seen from public.jobs where id = %s", (job["id"],)
+            ).fetchone()
+        self.assertEqual(last_seen, (first, first + timedelta(hours=1, seconds=1)))
+
+    def test_close_missing_is_scoped_to_successful_boards(self):
         now = datetime(2026, 11, 25, tzinfo=timezone.utc)
         db.upsert_jobs([
             self.job(),
-            self.job(id="lever:broken:2", company="Broken"),
+            self.job(id="greenhouse:other:2", company="Other"),
             self.job(id="simplify:3", source="simplify", company="FeedCo"),
             self.job(id="greenhouse:acme:4", title="Still open"),
         ], now)
-        db.close_missing_jobs({"greenhouse:acme"}, {"greenhouse:acme:4"}, now)
+        raw_conn = psycopg.connect(TEST_URL)
+
+        class CountingConnection:
+            calls = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc_info):
+                return raw_conn.__exit__(*exc_info)
+
+            def execute(self, *args, **kwargs):
+                self.calls += 1
+                return raw_conn.execute(*args, **kwargs)
+
+        counted = CountingConnection()
+        with patch.object(db, "connect", return_value=counted):
+            db.close_missing_jobs({"greenhouse:acme"}, {"greenhouse:acme:4"}, now)
+        self.assertEqual(counted.calls, 1)
         with psycopg.connect(TEST_URL) as conn:
             rows = dict(conn.execute("select id, closed_at from public.jobs").fetchall())
         self.assertEqual(rows["greenhouse:acme:123"], now)
-        self.assertIsNone(rows["lever:broken:2"])
+        self.assertIsNone(rows["greenhouse:other:2"])
         self.assertIsNone(rows["simplify:3"])
         self.assertIsNone(rows["greenhouse:acme:4"])
 
@@ -83,3 +118,17 @@ class JobsDatabaseTests(unittest.TestCase):
                 "select name from public.default_top_companies"
             ).fetchall()}
         self.assertEqual(names, {"NewCo", "FeedCo"})
+
+    def test_health_value_round_trip(self):
+        health = {
+            "last_completed_scan": 1795564800.0,
+            "matching_jobs": 18,
+            "new_jobs": 2,
+            "successful_sources": 1,
+            "failed_sources": 1,
+            "stale_failed_sources": 0,
+            "sources": {"https://example.invalid": {"ok": False, "error": "Timeout"}},
+        }
+        self.assertEqual(state_db.load_health(), {})
+        state_db.save_health(health)
+        self.assertEqual(state_db.load_health(), health)
