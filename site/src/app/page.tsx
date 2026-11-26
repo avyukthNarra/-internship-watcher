@@ -22,7 +22,9 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const [{ data: { user }, error: authError }] = await Promise.all([supabase.auth.getUser()]);
   let jobs: FeedJob[] = [];
   let count = 0;
-  let feedError: string | null = authError ? "We couldn’t verify your session. Refresh the page and try again." : null;
+  // A signed-out visitor has no session; getUser() reports that as AuthSessionMissingError. Only real auth failures are errors.
+  const realAuthError = authError && authError.name !== "AuthSessionMissingError" ? authError : null;
+  let feedError: string | null = realAuthError ? "We couldn’t verify your session. Refresh the page and try again." : null;
 
   if (!feedError && topOnly) {
     const result = await supabase.rpc("top_jobs", {
