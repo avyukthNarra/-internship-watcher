@@ -54,6 +54,29 @@ class JobsDatabaseTests(unittest.TestCase):
         self.assertEqual(row, (first, first + timedelta(minutes=20),
                                "Software Engineering Intern", "Austin"))
 
+    def test_duplicate_ids_use_the_last_job_record(self):
+        now = datetime(2026, 11, 25, tzinfo=timezone.utc)
+        first = self.job(title="First copy")
+        last = self.job(title="Last copy", location="New York")
+        self.assertEqual(db.upsert_jobs([first, last], now), {first["id"]})
+        with psycopg.connect(TEST_URL) as conn:
+            row = conn.execute(
+                "select title, location from public.jobs where id = %s", (first["id"],)
+            ).fetchone()
+        self.assertEqual(row, ("Last copy", "New York"))
+
+    def test_jobs_are_written_in_batches_without_losing_inserted_ids(self):
+        jobs = [
+            self.job(id=f"greenhouse:acme:{index}",
+                     url=f"https://boards.greenhouse.io/acme/jobs/{index}")
+            for index in range(1001)
+        ]
+        ids = {job["id"] for job in jobs}
+        self.assertEqual(db.upsert_jobs(jobs, datetime(2026, 11, 25, tzinfo=timezone.utc)), ids)
+        with psycopg.connect(TEST_URL) as conn:
+            count = conn.execute("select count(*) from public.jobs").fetchone()[0]
+        self.assertEqual(count, 1001)
+
     def test_last_seen_only_advances_after_one_hour_when_fields_are_unchanged(self):
         first = datetime(2026, 11, 25, tzinfo=timezone.utc)
         job = self.job()

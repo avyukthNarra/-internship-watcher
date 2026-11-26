@@ -35,12 +35,13 @@ def sync_default_top_companies(cfg):
 
 
 def upsert_jobs(jobs, now):
-    """Upsert a scan in one round trip; return only IDs inserted this run."""
+    """Upsert jobs in bounded batches and return IDs inserted this run."""
     now = _timestamp(now)
-    rows = []
+    rows_by_id = {}
     for job in jobs:
         job_id = job["id"]
-        rows.append((
+        # Configured boards and aggregate feeds can overlap; the last copy is authoritative.
+        rows_by_id[job_id] = (
             job_id,
             job_identity(job),
             job.get("company") or "",
@@ -52,15 +53,16 @@ def upsert_jobs(jobs, now):
             job.get("category"),
             now,
             now,
-        ))
+        )
+    rows = list(rows_by_id.values())
     if not rows:
         return set()
 
-    value_sql = sql.SQL(", ").join(
-        sql.SQL("({})").format(sql.SQL(", ").join(sql.Placeholder() for _ in rows[0]))
-        for _ in rows
+    batch_size = 1000
+    row_placeholders = sql.SQL("({})").format(
+        sql.SQL(", ").join(sql.Placeholder() for _ in rows[0])
     )
-    query = sql.SQL("""insert into public.jobs
+    statement = sql.SQL("""insert into public.jobs
         (id, identity, company, title, location, url, terms, source, category, first_seen, last_seen)
         values {values}
         on conflict (id) do update set
@@ -84,11 +86,17 @@ def upsert_jobs(jobs, now):
            or public.jobs.category is distinct from excluded.category
            or public.jobs.closed_at is not null
            or public.jobs.last_seen <= excluded.last_seen - interval '1 hour'
-        returning id, (xmax = 0) as inserted""").format(values=value_sql)
-    params = [value for row in rows for value in row]
+        returning id, (xmax = 0) as inserted""")
+    inserted_ids = set()
     with connect() as conn:
-        returned = conn.execute(query, params).fetchall()
-    return {job_id for job_id, inserted in returned if inserted}
+        for start in range(0, len(rows), batch_size):
+            batch = rows[start:start + batch_size]
+            values_sql = sql.SQL(", ").join(row_placeholders for _ in batch)
+            query = statement.format(values=values_sql)
+            params = [value for row in batch for value in row]
+            returned = conn.execute(query, params).fetchall()
+            inserted_ids.update(job_id for job_id, inserted in returned if inserted)
+    return inserted_ids
 
 
 def close_missing_jobs(board_sources_ok, seen_ids, now):
