@@ -167,6 +167,10 @@ python watcher.py --dry-run
 python watcher.py
 ```
 
+### Database tests
+
+Run `scripts/db_test.sh` to start a temporary local PostgreSQL instance, apply the schema and RLS checks, and run the database tests. Install PostgreSQL 18 and the project dependencies first.
+
 Check the boards in the actual configuration, a selected company, or a new candidate:
 
 ```bash
