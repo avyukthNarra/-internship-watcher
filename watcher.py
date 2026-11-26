@@ -773,6 +773,21 @@ def main(argv=None):
     previous_sources = dict(SOURCE_HEALTH)
     seeded = seeded_boards(ledger, seen, previous_sources, cfg.get("companies", []))
     all_jobs = discover(cfg)
+    now = time.time()
+    if os.environ.get("DATABASE_URL") and not dry_run:
+        import db
+        db.sync_default_top_companies(cfg)
+        db.upsert_jobs(all_jobs, now)
+        board_sources_ok = set()
+        for company in cfg.get("companies", []):
+            source = company["ats"] + ":" + company_board(company)
+            url = board_url(company["ats"], company_board(company))
+            if source in getattr(all_jobs, "boards", {}) and SOURCE_HEALTH.get(url, {}).get("ok"):
+                board_sources_ok.add(source)
+        board_seen_ids = {
+            job["id"] for board in getattr(all_jobs, "boards", {}).values() for job in board
+        }
+        db.close_missing_jobs(board_sources_ok, board_seen_ids, now)
     for source, jobs in getattr(all_jobs, "boards", {}).items():
         if source not in seeded:
             seen.update(job["id"] for job in jobs)
@@ -782,7 +797,6 @@ def main(argv=None):
     # belongs to a source no longer polled and must not stay in current health.
     current_sources = {url: record for url, record in SOURCE_HEALTH.items()
                        if record is not previous_sources.get(url)}
-    now = time.time()
     new_jobs = select_new(all_jobs, seen, ledger, now, cfg.get("dedup_days", DEFAULT_DEDUP_DAYS))
     print(f"Found {len(all_jobs)} matching postings, {len(new_jobs)} new.")
     for j in new_jobs:

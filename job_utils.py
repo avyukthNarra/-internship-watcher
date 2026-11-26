@@ -10,6 +10,10 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 def load_json(path, default):
     path = Path(path)
+    # Keep the same callers and document format while routing only watcher state.
+    from state_db import handles, load
+    if handles(path):
+        return load(path.name, default)
     if not path.exists():
         return default
     # Corrupt state must stop the run, never masquerade as an empty history.
@@ -18,6 +22,10 @@ def load_json(path, default):
 
 def save_json(path, data):
     path = Path(path)
+    from state_db import handles, save
+    if handles(path):
+        save(path.name, data)
+        return
     fd, temp = tempfile.mkstemp(prefix=path.name + '.', dir=path.parent)
     try:
         with os.fdopen(fd, 'w') as stream:
